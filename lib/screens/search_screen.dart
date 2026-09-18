@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../data/restaurants_data.dart'; 
-import '../models/restaurant.dart';     
-import '../widgets/crowding_badge.dart'; 
+import '../data/restaurants_data.dart';
+import '../models/restaurant.dart';
+import '../widgets/crowding_badge.dart';
+import 'detail_screen.dart';
 
 // Fixed lists of sample data (not yet sourced from an actual database)
 const _recentNames = ['Starbucks', 'Kai Sushi', 'Cosechas'];
@@ -64,7 +65,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _onSelect(Restaurant r) {
     // Called when the user taps a restaurant in the list
-    // TODO: Navigator.push a DetailScreen(r)
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => DetailScreen(restaurant: r)),
+    );
   }
 
   @override

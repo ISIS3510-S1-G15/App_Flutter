@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import 'detail_screen.dart';
 
 // The person's saved dietary preferences (currently hardcoded; in the future, these will come from the onboarding survey or user profile)
 const _userDietaryPreferences = ['Vegan', 'Vegetarian'];
@@ -11,9 +12,11 @@ class SavedScreen extends StatelessWidget {
   // StatelessWidget because this screen doesn't manage its own changing state (displays saved data)
   const SavedScreen({super.key});
 
-  void _onSelect(Restaurant r) {
+  void _onSelect(BuildContext context, Restaurant r) {
     // Called when the user taps a restaurant card
-    // TODO: Navigator.push to DetailScreen(r)
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => DetailScreen(restaurant: r)),
+    );
   }
 
   @override
@@ -174,7 +177,7 @@ class SavedScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _SavedCard(
                       restaurant: r,
-                      onTap: () => _onSelect(r),
+                      onTap: () => _onSelect(context, r),
                     ),
                   )),
             const SizedBox(height: 20),
@@ -192,7 +195,7 @@ class SavedScreen extends StatelessWidget {
                 itemBuilder: (_, i) {
                   final r = recentlyViewed[i];
                   return GestureDetector(
-                    onTap: () => _onSelect(r),
+                    onTap: () => _onSelect(context, r),
                     child: Container(
                       width: 120,
                       decoration: BoxDecoration(
