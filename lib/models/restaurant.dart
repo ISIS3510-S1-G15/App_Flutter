@@ -12,6 +12,7 @@ class Restaurant {
   final String waitTime;
   final List<String> tags;
   final bool saved;
+  final String hours;
 
   const Restaurant({
     required this.id,
@@ -26,5 +27,6 @@ class Restaurant {
     required this.waitTime,
     required this.tags,
     this.saved = false,
+    required this.hours
   });
 }

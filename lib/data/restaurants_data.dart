@@ -14,6 +14,8 @@ final List<Restaurant> restaurants = [
     price: '\$',
     waitTime: '2-5 min',
     tags: ['Coffee', 'Pastries'],
+    saved: true,
+    hours: '6:30am - 8:00pm',
   ),
   const Restaurant(
     id: '2',
@@ -27,6 +29,8 @@ final List<Restaurant> restaurants = [
     price: '\$\$',
     waitTime: '10-15 min',
     tags: ['Ramen', 'Pho'],
+    saved: false,
+    hours: '11:30am - 9:00pm',
   ),
   const Restaurant(
     id: '3',
@@ -40,6 +44,8 @@ final List<Restaurant> restaurants = [
     price: '\$',
     waitTime: '5 min',
     tags: ['Vegan options', 'Smoothies'],
+    saved: true,
+    hours: '7:00am - 5:00pm',
   ),
   const Restaurant(
     id: '4',
@@ -53,5 +59,7 @@ final List<Restaurant> restaurants = [
     price: '\$',
     waitTime: '5-10 min',
     tags: ['Burgers'],
+    saved: true,
+    hours: '11:30am - 8:00pm',
   ),
 ];
