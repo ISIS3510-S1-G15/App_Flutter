@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import '../widgets/filter_chip.dart';
 import 'detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -51,14 +52,14 @@ class _MapScreenState extends State<MapScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  _FilterChip(
+                  AppFilterChip(
                     label: 'All Spots',
                     active: _filter == 'all',
                     activeColor: AppColors.dark,
                     onTap: () => setState(() => _filter = 'all'),
                   ),
                   const SizedBox(width: 8),
-                  _FilterChip(
+                  AppFilterChip(
                     label: 'Open Now',
                     active: _filter == 'open',
                     activeColor: AppColors.open,
@@ -195,37 +196,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool active;
-  final Color activeColor;
-  final VoidCallback onTap;
-
-  const _FilterChip({required this.label, required this.active, required this.activeColor, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          color: active ? activeColor : AppColors.card,
-          borderRadius: BorderRadius.circular(999),
-          border: active ? null : Border.all(color: AppColors.closed.withOpacity(0.25)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: active ? Colors.white : AppColors.closed,
-          ),
-        ),
-      ),
-    );
-  }
-}
+// _FilterChip was moved to lib/widgets/filter_chip.dart (AppFilterChip) so HomeScreen can reuse it
 
 class _LegendRow extends StatelessWidget {
   final Color color;

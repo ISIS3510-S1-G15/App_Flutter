@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/survey_answers.dart';
+import '../data/profile_data.dart';
 
 // Colors used only in this screen (everything else comes from AppColors)
-const _border = Color(0xFFE8E0D4);      // border of white cards and chips
-const _borderLight = Color(0xFFF0E8DE); // softer border for list rows and stat tiles
-const _muted = Color(0xFF7A6D5F);       // secondary text under stat tiles
 const _greenBg = Color(0xFFE8F5EB);     // dietary restriction chip background
 const _greenText = Color(0xFF3A8C4F);   // dietary restriction chip text
 const _greenBorder = Color(0xFFC5E0CB); // dietary restriction chip border
@@ -13,21 +11,12 @@ const _greenBorder = Color(0xFFC5E0CB); // dietary restriction chip border
 // Number of survey fields counted towards "Profile completeness"
 const _totalFields = 6;
 
-// The person's survey answers (currently hardcoded; in the future, these will come from the onboarding survey)
-const _mockProfile = SurveyAnswers(
-  cuisines: ['Mexican', 'Vegetarian'],
-  dietaryRestrictions: ['Lactose-free', 'Halal'],
-  mealFrequency: 'Daily',
-  mealTimes: ['Dinner'],
-  budget: '\$8.000 – \$15.000',
-  priorities: ['Sustainability', 'Proximity', 'Variety'],
-);
-
 class ProfileScreen extends StatelessWidget {
   // StatelessWidget because this screen only displays the profile it receives (no state of its own)
   final SurveyAnswers profile;
 
-  const ProfileScreen({super.key, this.profile = _mockProfile});
+  // Defaults to the shared mock profile (lib/data/profile_data.dart) until the survey produces a real one
+  const ProfileScreen({super.key, this.profile = mockProfile});
 
   void _onRetakeSurvey() {
     // TODO: Navigator.push a SurveyScreen so the user can answer the survey again
@@ -234,7 +223,7 @@ class ProfileScreen extends StatelessWidget {
                             label: c,
                             background: AppColors.card,
                             textColor: AppColors.dark,
-                            borderColor: _border,
+                            borderColor: AppColors.border,
                           ))
                       .toList(),
                 ),
@@ -277,7 +266,7 @@ class ProfileScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppColors.background,
                             shape: BoxShape.circle,
-                            border: Border.all(color: _border),
+                            border: Border.all(color: AppColors.border),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -306,7 +295,7 @@ class ProfileScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.card,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _borderLight),
+                    border: Border.all(color: AppColors.borderLight),
                   ),
                   child: Text(profile.dislikedFoods, style: AppTextStyles.body.copyWith(fontSize: 13)),
                 ),
@@ -323,7 +312,7 @@ class ProfileScreen extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.card,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _border),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -364,7 +353,7 @@ class _CircleButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.card,
           shape: BoxShape.circle,
-          border: Border.all(color: _border),
+          border: Border.all(color: AppColors.border),
         ),
         child: Icon(icon, size: 16, color: AppColors.dark),
       ),
@@ -387,7 +376,7 @@ class _StatTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderLight),
+        border: Border.all(color: AppColors.borderLight),
       ),
       child: Column(
         children: [
@@ -399,7 +388,7 @@ class _StatTile extends StatelessWidget {
             style: AppTextStyles.cardTitle.copyWith(fontSize: 11, height: 1.2),
           ),
           const SizedBox(height: 4),
-          Text(label, style: AppTextStyles.body.copyWith(fontSize: 10, color: _muted)),
+          Text(label, style: AppTextStyles.body.copyWith(fontSize: 10, color: AppColors.muted)),
         ],
       ),
     );
@@ -482,7 +471,7 @@ class _ListRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _borderLight),
+        border: Border.all(color: AppColors.borderLight),
       ),
       child: Row(
         children: [

@@ -8,6 +8,10 @@ class AppColors {
   static const open = Color(0xFF119A00);        // ícono de estado "Open"
   static const closed = Color(0xFFA6A6A6);      // ícono de estado "Closed"
   static const card = Color(0xFFFFFFFF);        // tarjetas individuales de restaurante
+  static const border = Color(0xFFE8E0D4);      // borde de tarjetas blancas y chips
+  static const borderLight = Color(0xFFF0E8DE); // borde más suave para filas y tarjetas de lista
+  static const muted = Color(0xFF7A6D5F);       // texto secundario (ubicación, etiquetas, precio)
+  static const mutedLight = Color(0xFFB8AC9E);  // texto terciario (separadores "·", conteo de reseñas)
 }
 
 class AppTextStyles {
