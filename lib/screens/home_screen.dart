@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // ---------- Header: university label + greeting/title + avatar button ----------
+            // Header: university label + greeting/title + avatar button
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
               child: Row(
@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // ---------- Today's Pick: big featured card (only when no category filter is active) ----------
+            // Today's Pick: big featured card (only when no category filter is active)
             if (_activeCategory == 'All') ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
             ],
 
-            // ---------- Categories: horizontally scrollable row of pills ----------
+            // Categories: horizontally scrollable row of pills
             SizedBox(
               height: 36,
               child: ListView.separated(
@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
 
-            // ---------- List header: "N Spots Near You" + Filter ----------
+            // List header: "N Spots Near You" + Filter 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -183,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
 
-            // ---------- Restaurant list: one card per filtered restaurant ----------
+            // Restaurant list: one card per filtered restaurant
             ...filtered.map((r) => Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: _RestaurantCard(restaurant: r, onTap: () => _onSelect(r)),
@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ---------- Reusable widget: large "Today's Pick" card with photo, gradient and info overlay ----------
+// Reusable widget: large "Today's Pick" card with photo, gradient and info overlay
 class _FeaturedCard extends StatelessWidget {
   final Restaurant restaurant;
   final VoidCallback onTap;
@@ -284,7 +284,7 @@ class _FeaturedCard extends StatelessWidget {
   }
 }
 
-// ---------- Reusable widget: small solid pill with uppercase white text (FEATURED / OPEN / CLOSED) ----------
+// Reusable widget: small solid pill with uppercase white text (FEATURED / OPEN / CLOSED)
 class _Pill extends StatelessWidget {
   final String label;
   final Color background;
@@ -304,7 +304,7 @@ class _Pill extends StatelessWidget {
   }
 }
 
-// ---------- Reusable widget: horizontal restaurant card (photo on the left, info on the right) ----------
+// usable widget: horizontal restaurant card (photo on the left, info on the right)
 class _RestaurantCard extends StatelessWidget {
   final Restaurant restaurant;
   final VoidCallback onTap;

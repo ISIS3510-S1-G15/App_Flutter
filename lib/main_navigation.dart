@@ -15,17 +15,22 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
+  int _previousIndex = 0; // Tab that was open before the current one, so Profile's back button can return to it
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    SearchScreen(),
-    MapScreen(),
-    SavedScreen(),
-    ProfileScreen(),
-  ];
+  // Built as a getter (not a const list) because ProfileScreen needs a callback that references this State
+  List<Widget> get _screens => [
+        const HomeScreen(),
+        const SearchScreen(),
+        const MapScreen(),
+        const SavedScreen(),
+        // The tabs are not routes (there is nothing to pop), so Profile gets a callback that switches tabs instead
+        ProfileScreen(onBack: () => _onItemTapped(_previousIndex)),
+      ];
 
   void _onItemTapped(int index) {
+    if (index == _selectedIndex) return; // Tapping the tab that is already open changes nothing
     setState(() {
+      _previousIndex = _selectedIndex;
       _selectedIndex = index;
     });
   }

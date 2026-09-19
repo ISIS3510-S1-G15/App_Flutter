@@ -15,11 +15,24 @@ class ProfileScreen extends StatelessWidget {
   // StatelessWidget because this screen only displays the profile it receives (no state of its own)
   final SurveyAnswers profile;
 
+  // What the back button does. MainNavigation passes a callback thatswitches back to the previous tab. 
+  // If this screen is pushed as a route instead, the back button pops the route.
+  final VoidCallback? onBack;
+
   // Defaults to the shared mock profile (lib/data/profile_data.dart) until the survey produces a real one
-  const ProfileScreen({super.key, this.profile = mockProfile});
+  const ProfileScreen({super.key, this.profile = mockProfile, this.onBack});
 
   void _onRetakeSurvey() {
     // TODO: Navigator.push a SurveyScreen so the user can answer the survey again
+  }
+
+  void _handleBack(BuildContext context) {
+    // Uses the parent's callback if it gave one (tab mode); otherwise pops this route (pushed mode)
+    if (onBack != null) {
+      onBack!();
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -44,7 +57,7 @@ class ProfileScreen extends StatelessWidget {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // ---------- Top bar: back button + title + "Edit" ----------
+            // Top bar: back button + title + "Edit"
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
               child: Row(
@@ -52,8 +65,7 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   _CircleButton(
                     icon: Icons.arrow_back_ios_new,
-                    // maybePop: goes back only if there is a screen to go back to (the tab itself has none)
-                    onTap: () => Navigator.of(context).maybePop(),
+                    onTap: () => _handleBack(context),
                   ),
                   Text('My Profile', style: AppTextStyles.headline.copyWith(fontSize: 17)),
                   GestureDetector(
@@ -71,7 +83,7 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
 
-            // ---------- Hero card: avatar, name, university and completeness bar ----------
+            // Hero card: avatar, name, university and completeness bar
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.all(20),
@@ -156,7 +168,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // ---------- Stats row: three equal-width tiles ----------
+            // Stats row: three equal-width tiles
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -189,7 +201,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // ---------- Dietary Restrictions (green chips) ----------
+            // Dietary Restrictions (green chips) 
             // Each section below is only shown if the user answered that question
             if (profile.dietaryRestrictions.isNotEmpty)
               _Section(
@@ -210,7 +222,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
 
-            // ---------- Cuisine Preferences (white chips) ----------
+            // Cuisine Preferences (white chips)
             if (profile.cuisines.isNotEmpty)
               _Section(
                 title: 'Cuisine Preferences',
@@ -229,7 +241,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
 
-            // ---------- Usual Meal Times (one row per time, with an orange dot) ----------
+            // Usual Meal Times (one row per time, with an orange dot)
             if (profile.mealTimes.isNotEmpty)
               _Section(
                 title: 'Usual Meal Times',
@@ -251,7 +263,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
 
-            // ---------- Top Priorities (one row per priority, numbered by rank) ----------
+            // Top Priorities (one row per priority, numbered by rank)
             if (profile.priorities.isNotEmpty)
               _Section(
                 title: 'Top Priorities',
@@ -284,7 +296,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
 
-            // ---------- Foods to Avoid (free text written in the survey) ----------
+            // Foods to Avoid (free text written in the survey)
             if (profile.dislikedFoods.isNotEmpty)
               _Section(
                 title: 'Foods to Avoid',
@@ -301,7 +313,7 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
 
-            // ---------- Actions: retake the survey ----------
+            // Actions: retake the survey
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               child: InkWell(
@@ -335,7 +347,7 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// ---------- Reusable widget: round white button with an icon (used for "back") ----------
+// Reusable widget: round white button with an icon (used for "back")
 class _CircleButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -361,7 +373,7 @@ class _CircleButton extends StatelessWidget {
   }
 }
 
-// ---------- Reusable widget: one tile of the stats row (emoji, value, label) ----------
+// Reusable widget: one tile of the stats row (emoji, value, label)
 class _StatTile extends StatelessWidget {
   final String emoji;
   final String value;
@@ -395,7 +407,7 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-// ---------- Reusable widget: section with an emoji + title header and any content below ----------
+// Reusable widget: section with an emoji + title header and any content below
 class _Section extends StatelessWidget {
   final String title;
   final String emoji;
@@ -425,7 +437,7 @@ class _Section extends StatelessWidget {
   }
 }
 
-// ---------- Reusable widget: rounded pill chip (dietary restrictions and cuisines) ----------
+// Reusable widget: rounded pill chip (dietary restrictions and cuisines)
 class _Chip extends StatelessWidget {
   final String label;
   final Color background;
@@ -456,7 +468,7 @@ class _Chip extends StatelessWidget {
   }
 }
 
-// ---------- Reusable widget: white row with a leading widget and a label (meal times and priorities) ----------
+// Reusable widget: white row with a leading widget and a label (meal times and priorities)
 class _ListRow extends StatelessWidget {
   final Widget leading;
   final String label;
