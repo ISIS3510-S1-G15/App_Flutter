@@ -93,7 +93,7 @@ final List<Restaurant> restaurants = [
     id: '4',
     name: 'La Puerta',
     location: 'Calle 19',
-    category: 'Dining Hall',
+    category: 'Burgers',
     image: 'web/icons/la_puerta.png',
     isOpen: false,
     rating: 4.2,

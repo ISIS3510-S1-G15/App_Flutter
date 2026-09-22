@@ -4,13 +4,14 @@ import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import 'detail_screen.dart';
+import '../services/search_analytics.dart'; // logs searches with no results to the backend
 
 // Fixed lists of sample data (not yet sourced from an actual database)
 const _recentNames = ['Starbucks', 'Kai Sushi', 'Cosechas'];
 const _popularTags = ['Vegan options', 'Halal', 'Open late', 'Quick pickup', 'Coffee'];
 
 class SearchScreen extends StatefulWidget {
-  // “StatefulWidget” because this screen does change as the user interacts with it (types in the search bar, taps a tag, etc.). It needs to remember that state
+  // "StatefulWidget" because this screen does change as the user interacts with it (types in the search bar, taps a tag, etc.). It needs to remember that state
   const SearchScreen({super.key});
 
   @override
@@ -35,7 +36,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _focusNode.addListener(() {
       // Every time the focus changes (the user taps or exits the input field)...
       setState(() => _focused = _focusNode.hasFocus);
-      // ...updates “_focused” and tells Flutter to redraw the screen
+      // ...updates "_focused" and tells Flutter to redraw the screen
     });
   }
 
@@ -53,7 +54,7 @@ class _SearchScreenState extends State<SearchScreen> {
     // If nothing has been entered, there are no results to display (another view is displayed instead)
 
     final q = _query.toLowerCase();
-    // Converts the search to lowercase so that “starbucks” matches "Starbucks"
+    // Converts the search to lowercase so that "starbucks" matches "Starbucks"
     return restaurants.where((r) {
       // Filters the complete list of restaurants, keeping only those that match by name, category, location, or any of their tags
       return r.name.toLowerCase().contains(q) ||
@@ -61,6 +62,17 @@ class _SearchScreenState extends State<SearchScreen> {
           r.location.toLowerCase().contains(q) ||
           r.tags.any((t) => t.toLowerCase().contains(q));
     }).toList();
+  }
+
+  void _onSearchSubmitted(String value) {
+    // Called only when the user presses Enter / Done on the keyboard,
+    // once they've finished typing — not on every keystroke
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return;
+
+    if (_results.isEmpty) {
+      SearchAnalytics.logZeroResultSearch(trimmed.toLowerCase());
+    }
   }
 
   void _onSelect(Restaurant r) {
@@ -76,7 +88,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     final results = _results; // The restaurants that match the current search
     final showEmpty = _query.trim().isNotEmpty && results.isEmpty;
-    // True if the user entered something but there are no results (to display “no results”)
+    // True if the user entered something but there are no results (to display "no results")
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -84,7 +96,7 @@ class _SearchScreenState extends State<SearchScreen> {
         // Prevents the content from appearing below the phone's status bar (time, battery, etc.)
         child: Column(
           children: [
-            // ---------- HEADER: “Search” title + search box ----------
+            // ---------- HEADER: "Search" title + search box ----------
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
               child: Column(
@@ -93,7 +105,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   Text('Search', style: AppTextStyles.headline.copyWith(fontSize: 24)),
                   const SizedBox(height: 16),
 
-                  // Search input box (magnifying glass icon + text field + “x” button)
+                  // Search input box (magnifying glass icon + text field + "x" button)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     decoration: BoxDecoration(
@@ -116,7 +128,11 @@ class _SearchScreenState extends State<SearchScreen> {
                             controller: _controller,
                             focusNode: _focusNode,
                             onChanged: (v) => setState(() => _query = v),
-                            // Every time the text changes, update “_query,” and Flutter will automatically recalculate the results
+                            // Every time the text changes, update "_query," and Flutter will automatically recalculate the results shown on screen
+                            onSubmitted: _onSearchSubmitted,
+                            // Only logs the search to the backend when the user presses Enter/Done
+                            textInputAction: TextInputAction.search,
+                            // Makes the keyboard's Enter key show as a "search" icon instead of a generic checkmark
                             style: AppTextStyles.body.copyWith(fontSize: 14),
                             decoration: InputDecoration(
                               hintText: 'Restaurant name, cuisine, location...',
@@ -126,7 +142,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                           ),
                         ),
-                        // “x” button to clear the search — appears only if text has been entered
+                        // "x" button to clear the search — appears only if text has been entered
                         if (_query.isNotEmpty)
                           GestureDetector(
                             onTap: () {
@@ -177,7 +193,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
                   // Case 2: There are results that match the search
                   if (results.isNotEmpty) ...[
-                                        // “...” (spread operator) inserts several individual widgets into the list, rather than placing them inside an extra container widget
+                                        // "..." (spread operator) inserts several individual widgets into the list, rather than placing them inside an extra container widget
                     Text(
                       '${results.length} result${results.length != 1 ? 's' : ''}',
                       // Shows "1 result" or "3 results" 
@@ -254,7 +270,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     Text('Browse by Tag', style: AppTextStyles.cardTitle.copyWith(fontSize: 13)),
                     const SizedBox(height: 10),
                     Wrap(
-                      // “Wrap” arranges the elements in rows and automatically moves to the next line when they no longer fit (like text that wraps to the next line)
+                      // "Wrap" arranges the elements in rows and automatically moves to the next line when they no longer fit (like text that wraps to the next line)
                       spacing: 8,
                       runSpacing: 8,
                       children: _popularTags.map((tag) {
@@ -309,7 +325,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
 // ---------- Widget: a single row of search results ----------
 class _SearchResultRow extends StatelessWidget {
-  // The “_” at the beginning of the name means that this class is “private”: it can only be used within this file, not from other files.
+  // The "_" at the beginning of the name means that this class is "private": it can only be used within this file, not from other files.
 
   final Restaurant restaurant;
   final String query; // Used to determine which part of the text to highlight
@@ -353,7 +369,7 @@ class _SearchResultRow extends StatelessWidget {
     final r = restaurant;
 
     return InkWell(
-      onTap: onTap, // Makes the entire row tappable (with a “ripple” effect when tapped)
+      onTap: onTap, // Makes the entire row tappable (with a "ripple" effect when tapped)
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(10),
@@ -381,7 +397,7 @@ class _SearchResultRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // Información del restaurante: nombre, ubicación, rating, categoría, estado
+            // Restaurant info: name, location, rating, category, status
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,7 +435,7 @@ class _SearchResultRow extends StatelessWidget {
               ),
             ),
             Icon(Icons.chevron_right, size: 16, color: AppColors.closed.withOpacity(0.6)),
-            // “>” arrow indicating that the row is tappable / leads to another screen
+            // ">" arrow indicating that the row is tappable / leads to another screen
           ],
         ),
       ),
