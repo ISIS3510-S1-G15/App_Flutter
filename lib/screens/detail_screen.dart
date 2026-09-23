@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import '../services/occupancy_service.dart';
+import '../widgets/occupancy_survey.dart';
 
 class DetailScreen extends StatefulWidget {
   final Restaurant restaurant;
@@ -15,6 +17,20 @@ class DetailScreen extends StatefulWidget {
 class _DetailScreenState extends State<DetailScreen> {
   late bool _saved = widget.restaurant.saved;
   int _activeMenu = 0;
+  List<int> _liveReports = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReports();
+  }
+
+  Future<void> _loadReports() async {
+    final reports = await OccupancyService.getReports(widget.restaurant.id);
+    if (mounted) {
+      setState(() => _liveReports = reports);
+    }
+  }
 
   void _onWriteReview() {
     // TODO: Navigator.push a WriteReviewScreen(widget.restaurant)
@@ -27,9 +43,9 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     final r = widget.restaurant;
-    final crowdAvg = r.crowdingReports.isEmpty
+    final crowdAvg = _liveReports.isEmpty
         ? null
-        : r.crowdingReports.reduce((a, b) => a + b) / r.crowdingReports.length;
+        : _liveReports.reduce((a, b) => a + b) / _liveReports.length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -228,10 +244,25 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
 
                 // ---------- Crowding ----------
-                if (r.crowdingReports.isNotEmpty && crowdAvg != null) ...[
-                  const SizedBox(height: 12),
-                  _CrowdingCard(avg: crowdAvg, reports: r.crowdingReports),
-                ],
+                const SizedBox(height: 12),
+                if (crowdAvg != null)
+                  _CrowdingCard(avg: crowdAvg, reports: _liveReports)
+                else
+                  _EmptyCrowdingCard(),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await OccupancySurvey.show(context, r.id, r.name);
+                    _loadReports(); // refresh the card right after reporting
+                  },
+                  icon: const Icon(Icons.people_outline, size: 16),
+                  label: const Text('Report crowding level'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.closed.withOpacity(0.3)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                ),
 
                 // ---------- Description ----------
                 if (r.description.isNotEmpty) ...[
@@ -481,6 +512,33 @@ class _CrowdingCard extends StatelessWidget {
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Shown when a restaurant has no crowding reports yet
+class _EmptyCrowdingCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.closed.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.closed.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 18, color: AppColors.closed),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'No crowding reports yet. Be the first to help other students!',
+              style: TextStyle(fontSize: 12.5, color: AppColors.closed),
+            ),
           ),
         ],
       ),
