@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
@@ -6,6 +7,7 @@ import '../widgets/crowding_badge.dart';
 import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import '../services/location_service.dart';
+import '../services/meal_context.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -26,6 +28,11 @@ class _MapScreenState extends State<MapScreen> {
   Position? _position;
   String? _locationError;
   bool _locating = true;
+  StreamSubscription<Position>? _positionSub; // Live GPS updates while the screen is open
+
+  // Current time, refreshed every minute so the meal context (breakfast, lunch...) stays up to date
+  DateTime _now = DateTime.now();
+  Timer? _clock;
 
   // Controls the real map's camera (center + zoom)
   final _mapController = MapController();
@@ -47,9 +54,19 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _loadLocation();
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() => _now = DateTime.now()));
   }
 
-  // Reads the GPS once when the screen opens (and again if the user taps "Retry")
+  @override
+  void dispose() {
+    // Stops the GPS and the clock when the screen is destroyed (saves battery)
+    _positionSub?.cancel();
+    _clock?.cancel();
+    super.dispose();
+  }
+
+  // Asks for permission and reads the GPS when the screen opens (and again if the user taps "Retry"),
+  // then keeps following the user so distances update while they walk
   Future<void> _loadLocation() async {
     setState(() {
       _locating = true;
@@ -63,6 +80,16 @@ class _MapScreenState extends State<MapScreen> {
       _locationError = result.error;
     });
     _centerOnUser();
+
+    if (result.position != null) {
+      _positionSub?.cancel();
+      _positionSub = LocationService.positionStream().listen(
+        (p) {
+          if (mounted) setState(() => _position = p);
+        },
+        onError: (_) {}, // Keeps the last known position if an update fails
+      );
+    }
   }
 
   double? _distanceTo(Restaurant r) =>
@@ -113,12 +140,19 @@ class _MapScreenState extends State<MapScreen> {
     if (open.isEmpty) {
       return const _LocationBanner(icon: Icons.near_me, text: 'No spots are open near you right now');
     }
-    final closest = open.first;
+
+    // Combines location + time of day + open status: the closest open spot that fits the current meal
+    final meal = MealMoment.at(_now);
+    final fitting = meal == null ? <Restaurant>[] : open.where((r) => meal.fits(r.category)).toList();
+    final pick = fitting.isNotEmpty ? fitting.first : open.first;
+    final text = fitting.isNotEmpty
+        ? '${meal!.label} time · Closest for ${meal.label.toLowerCase()}: ${pick.name} · ${_distanceLabel(pick)}'
+        : 'Closest open spot: ${pick.name} · ${_distanceLabel(pick)}';
     return _LocationBanner(
       icon: Icons.near_me,
-      text: 'Closest open spot: ${closest.name} · ${_distanceLabel(closest)}',
+      text: text,
       actionLabel: 'Show',
-      onAction: () => _selectSpot(closest),
+      onAction: () => _selectSpot(pick),
     );
   }
 

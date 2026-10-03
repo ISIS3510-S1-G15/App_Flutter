@@ -44,6 +44,11 @@ class LocationService {
     }
   }
 
+  // Follows the user while the screen is open: emits a new position every time they move 10 m or more
+  static Stream<Position> positionStream() => Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10),
+      );
+
   // Straight-line distance in meters between the user and a point
   static double distanceTo(Position from, double lat, double lng) =>
       Geolocator.distanceBetween(from.latitude, from.longitude, lat, lng);
