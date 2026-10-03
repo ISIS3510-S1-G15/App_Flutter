@@ -3,6 +3,10 @@ import '../theme/app_theme.dart';
 import '../data/profile_data.dart';
 import '../models/survey_answers.dart';
 import '../widgets/progress_bar.dart';
+import '../widgets/multi_select.dart';
+import '../widgets/app_text_field.dart';
+import '../widgets/primary_button.dart';
+import '../widgets/success_check.dart';
 
 // Number of steps (pages) of the survey
 const _totalSteps = 5;
@@ -148,29 +152,10 @@ class _SurveyScreenState extends State<SurveyScreen> {
                       const SizedBox(width: 12),
                     ],
                     Expanded(
-                      child: GestureDetector(
+                      child: AppPrimaryButton(
+                        label: _step < _totalSteps - 1 ? 'Continue' : 'Save Preferences',
                         onTap: _next,
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(color: AppColors.accent.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6)),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _step < _totalSteps - 1 ? 'Continue' : 'Save Preferences',
-                                style: AppTextStyles.button.copyWith(fontSize: 14),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white),
-                            ],
-                          ),
-                        ),
+                        trailingIcon: Icons.arrow_forward_ios,
                       ),
                     ),
                   ],
@@ -252,14 +237,14 @@ class _SurveyScreenState extends State<SurveyScreen> {
           title: 'What should we call you?',
           subtitle: 'Just your first name is fine',
           children: [
-            _SurveyTextField(
+            AppTextField(
               controller: _nameController,
               hint: 'Your name...',
               onChanged: (v) => setState(() => _answers = _answers.copyWith(name: v)),
             ),
             const SizedBox(height: 20),
             _QuestionLabel('What cuisines do you love?'),
-            _MultiSelect(
+            AppMultiSelect(
               options: _cuisines,
               selected: _answers.cuisines,
               activeColor: AppColors.accent,
@@ -275,7 +260,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           title: 'Any dietary restrictions?',
           subtitle: "We'll filter out what doesn't work for you",
           children: [
-            _MultiSelect(
+            AppMultiSelect(
               options: _dietary,
               selected: _answers.dietaryRestrictions,
               activeColor: AppColors.green,
@@ -292,7 +277,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           title: 'When do you eat on campus?',
           subtitle: 'Select your typical meal times',
           children: [
-            _MultiSelect(
+            AppMultiSelect(
               options: _mealTimes,
               selected: _answers.mealTimes,
               activeColor: AppColors.amber,
@@ -361,7 +346,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           title: 'What matters most?',
           subtitle: 'Pick up to 3 priorities when choosing where to eat',
           children: [
-            _MultiSelect(
+            AppMultiSelect(
               options: _priorities,
               selected: _answers.priorities,
               activeColor: AppColors.accent,
@@ -371,7 +356,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
             ),
             const SizedBox(height: 20),
             _QuestionLabel('Foods you want to avoid?'),
-            _SurveyTextField(
+            AppTextField(
               controller: _dislikedController,
               hint: 'e.g. spicy food, seafood, mushrooms...',
               maxLines: 3,
@@ -394,17 +379,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Orange circle with a check mark
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: AppColors.accent.withOpacity(0.35), blurRadius: 24, offset: const Offset(0, 10))],
-                ),
-                child: const Icon(Icons.check_rounded, size: 40, color: Colors.white),
-              ),
+              const SuccessCheck(), // Orange circle with a check mark
               const SizedBox(height: 16),
               Text(
                 // "¡Listo, Juan!" if the user wrote a name, "¡Listo!" otherwise
@@ -504,117 +479,6 @@ class _QuestionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(text, style: AppTextStyles.cardTitle.copyWith(fontSize: 13)),
-    );
-  }
-}
-
-// Reusable widget: white text field with an orange border when focused (name and foods to avoid)
-class _SurveyTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final int maxLines;
-  final ValueChanged<String> onChanged;
-
-  const _SurveyTextField({required this.controller, required this.hint, required this.onChanged, this.maxLines = 1});
-
-  @override
-  Widget build(BuildContext context) {
-    // Same rounded shape for both states; only the border color changes
-    OutlineInputBorder border(Color color) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: color),
-        );
-
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      maxLines: maxLines,
-      textCapitalization: maxLines == 1 ? TextCapitalization.words : TextCapitalization.sentences,
-      style: AppTextStyles.body.copyWith(fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.mutedLight, fontSize: 14),
-        filled: true,
-        fillColor: AppColors.card,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        enabledBorder: border(AppColors.border),
-        focusedBorder: border(AppColors.accent),
-      ),
-    );
-  }
-}
-
-// Reusable widget: group of toggle chips where several options can be selected at once
-class _MultiSelect extends StatelessWidget {
-  final List<String> options;
-  final List<String> selected;
-  final ValueChanged<String> onToggle;
-  final Color activeColor;      // Background of the selected chips (orange, green or amber depending on the question)
-  final Color activeTextColor;  // Text color of the selected chips
-  final String? maxLabel;       // Optional warning shown above the chips (e.g. "Max 3 selected")
-
-  const _MultiSelect({
-    required this.options,
-    required this.selected,
-    required this.onToggle,
-    required this.activeColor,
-    this.activeTextColor = Colors.white,
-    this.maxLabel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (maxLabel != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  maxLabel!,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent),
-                ),
-              ],
-            ),
-          ),
-        Wrap(
-          // Wrap lets the chips flow to a new line automatically if there are many
-          spacing: 8,
-          runSpacing: 8,
-          children: options.map((opt) {
-            final isSelected = selected.contains(opt);
-            return GestureDetector(
-              onTap: () => onToggle(opt),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? activeColor : AppColors.card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isSelected ? activeColor : AppColors.border),
-                ),
-                child: Text(
-                  // Selected chips show a check mark before the text
-                  isSelected ? '✓  $opt' : opt,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? activeTextColor : AppColors.dark,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 }

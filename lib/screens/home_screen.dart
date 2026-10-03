@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../data/profile_data.dart';
 import '../models/restaurant.dart';
+import '../utils/text_utils.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/filter_chip.dart';
 import 'detail_screen.dart';
@@ -107,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       alignment: Alignment.center,
                       child: profile.name.isNotEmpty
                           ? Text(
-                              profile.name.substring(0, 2).toUpperCase(),
+                              initialsOf(profile.name),
                               style: AppTextStyles.headline.copyWith(fontSize: 13, color: Colors.white),
                             )
                           : const Icon(Icons.person, size: 18, color: Colors.white),
