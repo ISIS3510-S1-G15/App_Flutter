@@ -7,6 +7,8 @@ import '../utils/text_utils.dart';
 import '../widgets/app_chip.dart';
 import '../widgets/circle_button.dart';
 import 'survey_screen.dart';
+import 'auth_gate.dart';
+import '../services/auth_service.dart';
 
 // Number of survey fields counted towards "Profile completeness"
 const _totalFields = 6;
@@ -309,7 +311,7 @@ class ProfileScreen extends StatelessWidget {
 
             // Actions: retake the survey
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: InkWell(
                 onTap: () => _onRetakeSurvey(context),
                 borderRadius: BorderRadius.circular(16),
@@ -332,6 +334,50 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
+            ),
+
+            // Session: logged-in email + "Log out" (closes the session and goes back to the login screen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              child: Column(
+                children: [
+                  if (AuthService.currentUser.value != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Logged in as ${AuthService.currentUser.value!.email}',
+                        style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.muted),
+                      ),
+                    ),
+                  InkWell(
+                    onTap: () => AuthGate.logout(context),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.logout, size: 16, color: AppColors.accent),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Log out',
+                            style: AppTextStyles.body.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
