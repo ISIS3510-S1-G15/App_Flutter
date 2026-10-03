@@ -4,6 +4,7 @@ import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/filter_chip.dart';
+import '../services/filter_analytics.dart';
 import 'detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -16,6 +17,13 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   String _filter = 'all'; // 'all' | 'open'
   Restaurant? _selected;
+
+  // Changes the active filter and reports it to the analytics backend (BQ Type 2)
+  void _onFilterTap(String filter, String label) {
+    if (_filter == filter) return; // Tapping the already active chip is not a new use
+    setState(() => _filter = filter);
+    FilterAnalytics.logFilterUsed(label, 'map');
+  }
 
   void _onSelect(Restaurant r) {
     Navigator.of(context).push(
@@ -56,14 +64,14 @@ class _MapScreenState extends State<MapScreen> {
                     label: 'All Spots',
                     active: _filter == 'all',
                     activeColor: AppColors.dark,
-                    onTap: () => setState(() => _filter = 'all'),
+                    onTap: () => _onFilterTap('all', 'All Spots'),
                   ),
                   const SizedBox(width: 8),
                   AppFilterChip(
                     label: 'Open Now',
                     active: _filter == 'open',
                     activeColor: AppColors.open,
-                    onTap: () => setState(() => _filter = 'open'),
+                    onTap: () => _onFilterTap('open', 'Open Now'),
                   ),
                 ],
               ),

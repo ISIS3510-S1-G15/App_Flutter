@@ -6,6 +6,7 @@ import '../models/restaurant.dart';
 import '../utils/text_utils.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/filter_chip.dart';
+import '../services/filter_analytics.dart';
 import 'detail_screen.dart';
 import 'profile_screen.dart';
 
@@ -44,6 +45,13 @@ class _HomeScreenState extends State<HomeScreen> {
     // Restaurants that belong to the active category (or all of them if 'All' is selected)
     if (_activeCategory == 'All') return restaurants;
     return restaurants.where((r) => r.category == _activeCategory).toList();
+  }
+
+  void _onCategoryTap(String cat) {
+    // Changes the active category and reports it to the analytics backend (BQ Type 2)
+    if (_activeCategory == cat) return; // Tapping the already active pill is not a new use
+    setState(() => _activeCategory = cat);
+    FilterAnalytics.logFilterUsed(cat, 'home');
   }
 
   void _onSelect(Restaurant r) {
@@ -160,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: cat,
                     active: _activeCategory == cat,
                     // Tapping a pill changes the filter and Flutter redraws the list below
-                    onTap: () => setState(() => _activeCategory = cat),
+                    onTap: () => _onCategoryTap(cat),
                   );
                 },
               ),
