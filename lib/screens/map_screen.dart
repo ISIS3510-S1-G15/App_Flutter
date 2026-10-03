@@ -7,6 +7,8 @@ import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import '../services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -24,6 +26,22 @@ class _MapScreenState extends State<MapScreen> {
   Position? _position;
   String? _locationError;
   bool _locating = true;
+
+  // Controls the real map's camera (center + zoom)
+  final _mapController = MapController();
+  bool _mapReady = false;
+
+  // Selects a spot (or clears the selection) and moves the map camera to it
+  void _selectSpot(Restaurant? r) {
+    setState(() => _selected = r);
+    if (r != null && _mapReady) _mapController.move(LatLng(r.latitude, r.longitude), 18);
+  }
+
+  // Centers the map on the user when they are on campus (off campus the campus view is more useful)
+  void _centerOnUser() {
+    if (!_mapReady || _position == null || !LocationService.isOnCampus(_position!)) return;
+    _mapController.move(LatLng(_position!.latitude, _position!.longitude), 17);
+  }
 
   @override
   void initState() {
@@ -44,6 +62,7 @@ class _MapScreenState extends State<MapScreen> {
       _position = result.position;
       _locationError = result.error;
     });
+    _centerOnUser();
   }
 
   double? _distanceTo(Restaurant r) =>
@@ -99,7 +118,7 @@ class _MapScreenState extends State<MapScreen> {
       icon: Icons.near_me,
       text: 'Closest open spot: ${closest.name} · ${_distanceLabel(closest)}',
       actionLabel: 'Show',
-      onAction: () => setState(() => _selected = closest),
+      onAction: () => _selectSpot(closest),
     );
   }
 
@@ -164,67 +183,93 @@ class _MapScreenState extends State<MapScreen> {
                   width: double.infinity,
                   child: Stack(
                     children: [
-                      Positioned.fill(child: CustomPaint(painter: _CampusMapPainter())),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          return Stack(
-                            children: visible.map((r) {
-                              final isSelected = _selected?.id == r.id;
-                              final left = constraints.maxWidth * (r.mapX / 100);
-                              final top = constraints.maxHeight * (r.mapY / 100);
-                              return Positioned(
-                                left: left - 16,
-                                top: top - 32,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _selected = isSelected ? null : r),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (isSelected)
+                      // Real map (OpenStreetMap tiles) with a pin for each spot and a blue dot for the user
+                      FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: const LatLng(LocationService.campusLat, LocationService.campusLng),
+                          initialZoom: 17,
+                          onMapReady: () {
+                            _mapReady = true;
+                            _centerOnUser();
+                          },
+                          onTap: (_, __) => setState(() => _selected = null),
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.example.app_flutter',
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              ...visible.map((r) {
+                                final isSelected = _selected?.id == r.id;
+                                return Marker(
+                                  point: LatLng(r.latitude, r.longitude),
+                                  width: 140,
+                                  height: 80,
+                                  alignment: Alignment.topCenter, // The bottom of the pin sits on the restaurant
+                                  child: GestureDetector(
+                                    onTap: () => _selectSpot(isSelected ? null : r),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        if (isSelected)
+                                          Container(
+                                            margin: const EdgeInsets.only(bottom: 4),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(12),
+                                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8)],
+                                            ),
+                                            child: Text(r.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: AppTextStyles.cardTitle.copyWith(fontSize: 11)),
+                                          ),
                                         Container(
-                                          margin: const EdgeInsets.only(bottom: 4),
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          width: 32,
+                                          height: 32,
                                           decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8)],
+                                            color: isSelected
+                                                ? AppColors.accent
+                                                : (r.isOpen ? AppColors.dark : AppColors.closed),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 2),
+                                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)],
                                           ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(r.name,
-                                                  style: AppTextStyles.cardTitle.copyWith(fontSize: 11)),
-                                              Text(r.waitTime,
-                                                  style: TextStyle(fontSize: 9, color: AppColors.closed)),
-                                            ],
+                                          child: Center(
+                                            child: Text(_categoryEmoji(r.category), style: const TextStyle(fontSize: 12)),
                                           ),
                                         ),
-                                      Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: BoxDecoration(
-                                          color: isSelected
-                                              ? AppColors.accent
-                                              : (r.isOpen ? AppColors.dark : AppColors.closed),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 2),
-                                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4)],
-                                        ),
-                                        child: Center(
-                                          child: Text(_categoryEmoji(r.category), style: const TextStyle(fontSize: 12)),
-                                        ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                              if (_position != null)
+                                Marker(
+                                  point: LatLng(_position!.latitude, _position!.longitude),
+                                  width: 20,
+                                  height: 20,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 3),
+                                      boxShadow: [BoxShadow(color: Colors.blue.withValues(alpha: 0.4), blurRadius: 8)],
+                                    ),
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                          );
-                        },
+                            ],
+                          ),
+                          const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+                        ],
                       ),
                       // Legend
                       Positioned(
-                        bottom: 10,
+                        top: 10,
                         right: 10,
                         child: Container(
                           padding: const EdgeInsets.all(8),
@@ -273,7 +318,7 @@ class _MapScreenState extends State<MapScreen> {
                           restaurant: r,
                           selected: _selected?.id == r.id,
                           distanceLabel: _distanceLabel(r),
-                          onTap: () => setState(() => _selected = r),
+                          onTap: () => _selectSpot(r),
                         ),
                       )),
                 ],
@@ -472,66 +517,6 @@ String _categoryEmoji(String cat) {
   return map[cat] ?? '🍴';
 }
 
-// Decorative stylized campus map background (paths, buildings, water) matching the Figma design
-class _CampusMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Ground
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFFD4E8C2));
-
-    // Paths
-    final pathPaint = Paint()
-      ..color = const Color(0xFFC5D9B2)
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final path1 = Path()
-      ..moveTo(0, h * 0.5)
-      ..quadraticBezierTo(w * 0.3, h * 0.47, w * 0.5, h * 0.5)
-      ..quadraticBezierTo(w * 0.71, h * 0.53, w, h * 0.48);
-    canvas.drawPath(path1, pathPaint..strokeWidth = h * 0.06);
-
-    final path2 = Path()
-      ..moveTo(w * 0.5, 0)
-      ..quadraticBezierTo(w * 0.51, h * 0.27, w * 0.5, h * 0.5)
-      ..quadraticBezierTo(w * 0.49, h * 0.73, w * 0.5, h);
-    canvas.drawPath(path2, pathPaint..strokeWidth = h * 0.045);
-
-    final path3 = Path()
-      ..moveTo(0, h * 0.27)
-      ..quadraticBezierTo(w * 0.23, h * 0.28, w * 0.5, h * 0.27)
-      ..quadraticBezierTo(w * 0.74, h * 0.25, w, h * 0.27);
-    canvas.drawPath(path3, pathPaint..strokeWidth = h * 0.033);
-
-    // Buildings
-    final buildingPaint = Paint()..color = const Color(0xFFA8C4E0).withOpacity(0.8);
-    void building(double x, double y, double bw, double bh) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(w * x, h * y, w * bw, h * bh), const Radius.circular(6)),
-        buildingPaint,
-      );
-    }
-
-    building(0.09, 0.07, 0.17, 0.15);
-    building(0.37, 0.10, 0.16, 0.13);
-    building(0.66, 0.05, 0.20, 0.17);
-    building(0.11, 0.62, 0.14, 0.18);
-    building(0.39, 0.67, 0.19, 0.15);
-    building(0.69, 0.58, 0.21, 0.20);
-
-    // Water feature
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(w * 0.5, h * 0.5), width: w * 0.1, height: h * 0.08),
-      Paint()..color = const Color(0xFF7AB8D4).withOpacity(0.6),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 class _LocationBanner extends StatelessWidget {
   final IconData icon;
