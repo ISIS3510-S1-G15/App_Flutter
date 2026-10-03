@@ -3,11 +3,10 @@ import '../theme/app_theme.dart';
 import '../models/survey_answers.dart';
 import '../data/profile_data.dart';
 import '../widgets/progress_bar.dart';
+import '../utils/text_utils.dart';
+import '../widgets/app_chip.dart';
+import '../widgets/circle_button.dart';
 import 'survey_screen.dart';
-
-// Colors used only in this screen (everything else comes from AppColors)
-const _greenBg = Color(0xFFE8F5EB);     // dietary restriction chip background
-const _greenBorder = Color(0xFFC5E0CB); // dietary restriction chip border
 
 // Number of survey fields counted towards "Profile completeness"
 const _totalFields = 6;
@@ -51,7 +50,7 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildContent(BuildContext context, SurveyAnswers profile) {
     // First two letters of the name shown in the avatar; "ME" if there is no name yet
-    final initials = profile.name.isNotEmpty ? profile.name.substring(0, 2).toUpperCase() : 'ME';
+    final initials = initialsOf(profile.name, fallback: 'ME');
 
     // Counts how many of the survey fields have been answered, to fill the progress bar
     final completeness = [
@@ -76,7 +75,7 @@ class ProfileScreen extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _CircleButton(
+                  AppCircleButton(
                     icon: Icons.arrow_back_ios_new,
                     onTap: () => _handleBack(context),
                   ),
@@ -213,14 +212,7 @@ class ProfileScreen extends StatelessWidget {
                   // Wrap lets the chips flow to a new line automatically if there are many
                   spacing: 8,
                   runSpacing: 8,
-                  children: profile.dietaryRestrictions
-                      .map((d) => _Chip(
-                            label: '✓ $d',
-                            background: _greenBg,
-                            textColor: AppColors.green,
-                            borderColor: _greenBorder,
-                          ))
-                      .toList(),
+                  children: profile.dietaryRestrictions.map((d) => AppChip.diet(diet: d)).toList(),
                 ),
               ),
 
@@ -233,7 +225,7 @@ class ProfileScreen extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: profile.cuisines
-                      .map((c) => _Chip(
+                      .map((c) => AppChip(
                             label: c,
                             background: AppColors.card,
                             textColor: AppColors.dark,
@@ -349,32 +341,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// Reusable widget: round white button with an icon (used for "back")
-class _CircleButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _CircleButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Icon(icon, size: 16, color: AppColors.dark),
-      ),
-    );
-  }
-}
-
 // Reusable widget: one tile of the stats row (emoji, value, label)
 class _StatTile extends StatelessWidget {
   final String emoji;
@@ -434,37 +400,6 @@ class _Section extends StatelessWidget {
           const SizedBox(height: 10),
           child,
         ],
-      ),
-    );
-  }
-}
-
-// Reusable widget: rounded pill chip (dietary restrictions and cuisines)
-class _Chip extends StatelessWidget {
-  final String label;
-  final Color background;
-  final Color textColor;
-  final Color borderColor;
-
-  const _Chip({
-    required this.label,
-    required this.background,
-    required this.textColor,
-    required this.borderColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: borderColor),
-      ),
-      child: Text(
-        label,
-        style: AppTextStyles.body.copyWith(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import 'reviews_list_screen.dart';
+import 'write_review_screen.dart';
 
 class DetailScreen extends StatefulWidget {
   final Restaurant restaurant;
@@ -17,11 +19,17 @@ class _DetailScreenState extends State<DetailScreen> {
   int _activeMenu = 0;
 
   void _onWriteReview() {
-    // TODO: Navigator.push a WriteReviewScreen(widget.restaurant)
+    // Opens the review form for this restaurant ("Back to Restaurant" returns here)
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => WriteReviewScreen(restaurant: widget.restaurant)),
+    );
   }
 
   void _onSeeReviews() {
-    // TODO: Navigator.push a ReviewsListScreen(widget.restaurant)
+    // Opens the list of reviews of this restaurant (from there the user can also write one)
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ReviewsListScreen(restaurant: widget.restaurant)),
+    );
   }
 
   @override

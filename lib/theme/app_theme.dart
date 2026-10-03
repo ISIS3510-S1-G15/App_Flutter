@@ -12,7 +12,9 @@ class AppColors {
   static const borderLight = Color(0xFFF0E8DE); // borde más suave para filas y tarjetas de lista
   static const muted = Color(0xFF7A6D5F);       // texto secundario (ubicación, etiquetas, precio)
   static const mutedLight = Color(0xFFB8AC9E);  // texto terciario (separadores "·", conteo de reseñas)
-  static const green = Color(0xFF3A8C4F);       // restricciones alimentarias (chips del perfil y de la encuesta)
+  static const green = Color(0xFF3A8C4F);       // restricciones alimentarias (chips del perfil, encuesta y reseñas)
+  static const greenLight = Color(0xFFE8F5EB);  // fondo de los chips verdes de restricciones alimentarias
+  static const greenBorder = Color(0xFFC5E0CB); // borde de los chips verdes de restricciones alimentarias
   static const amber = Color(0xFFF4A735);       // opciones seleccionadas de horarios de comida en la encuesta
 }
 
