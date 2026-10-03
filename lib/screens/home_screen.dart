@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../data/profile_data.dart';
 import '../models/restaurant.dart';
 import '../utils/text_utils.dart';
+import '../utils/meal_context.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
@@ -24,18 +26,26 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _activeCategory = 'All'; // Which category pill is currently selected
 
+  // Context-aware: redraws the screen every minute so the greeting, the meal moment and the
+  // "open now" pick follow the real time even if the user leaves the app open
+  Timer? _clock;
+
   @override
   void initState() {
     // Runs ONLY once, when the screen is first created
     super.initState();
     userProfile.addListener(_onProfileChanged);
     // Listens to the profile saved by the survey, so the greeting and avatar update if the user edits it
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     // Stops listening when the screen is destroyed (otherwise it would try to redraw a screen that no longer exists)
     userProfile.removeListener(_onProfileChanged);
+    _clock?.cancel(); // stops the timer, otherwise it would keep running after the screen is gone
     super.dispose();
   }
 
@@ -72,7 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final profile = userProfile.value; // The profile created by the survey (name used for the greeting and avatar)
     final filtered = _filtered;
-    final featured = restaurants.first; // "Today's Pick" is always the first restaurant of the list
+    // Context (read from the phone, the user does nothing): current time -> meal moment and greeting
+    final now = DateTime.now();
+    final mealSlot = mealSlotFor(now);
+    // Today's Pick: best rated restaurant that is OPEN RIGHT NOW according to its opening hours (null if all are closed)
+    final featured = contextualPick(restaurants, now);
+    // True if, in the survey, the user said they usually eat at this moment of the day
+    final usualMealTime = profile.mealTimes.contains(mealSlot);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -100,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       Text(
                         // Greets the user by name if the survey has one; otherwise shows the app name
-                        profile.name.isNotEmpty ? 'Hola, ${profile.name} 👋' : 'Campus Eats',
+                        profile.name.isNotEmpty ? '${greetingFor(now)}, ${profile.name} 👋' : 'Campus Eats',
                         style: AppTextStyles.headline.copyWith(fontSize: 26, height: 1.2),
                       ),
                     ],
@@ -126,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Today's Pick: big featured card (only when no category filter is active)
+            // Today's Pick (context-aware): changes with the time of day. Only shown when no category filter is active
             if (_activeCategory == 'All') ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -134,8 +150,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text("Today's Pick", style: AppTextStyles.cardTitle.copyWith(fontSize: 15)),
+                    // e.g. "Lunch time · open now"
                     Text(
-                      'See all',
+                      '$mealSlot time · open now',
                       style: AppTextStyles.body.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -145,10 +162,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+              if (usualMealTime)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+                  child: Text(
+                    'You usually eat at this time 🍽️',
+                    style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.muted),
+                  ),
+                ),
               const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _FeaturedCard(restaurant: featured, onTap: () => _onSelect(featured)),
+                child: featured != null
+                    ? _FeaturedCard(restaurant: featured, isOpenNow: true, onTap: () => _onSelect(featured))
+                    : const _ClosedNowCard(),
               ),
               const SizedBox(height: 20),
             ],
@@ -222,8 +249,9 @@ class _HomeScreenState extends State<HomeScreen> {
 class _FeaturedCard extends StatelessWidget {
   final Restaurant restaurant;
   final VoidCallback onTap;
+  final bool isOpenNow; // computed from the opening hours and the current time (context-aware)
 
-  const _FeaturedCard({required this.restaurant, required this.onTap});
+  const _FeaturedCard({required this.restaurant, required this.onTap, required this.isOpenNow});
 
   @override
   Widget build(BuildContext context) {
@@ -272,8 +300,8 @@ class _FeaturedCard extends StatelessWidget {
                         _Pill(label: 'FEATURED', background: AppColors.accent),
                         const SizedBox(width: 8),
                         _Pill(
-                          label: r.isOpen ? 'OPEN' : 'CLOSED',
-                          background: r.isOpen ? AppColors.open : AppColors.muted,
+                          label: isOpenNow ? 'OPEN NOW' : 'CLOSED',
+                          background: isOpenNow ? AppColors.open : AppColors.muted,
                         ),
                       ],
                     ),
@@ -485,6 +513,36 @@ class _RestaurantCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Shown instead of Today's Pick when, at the current time, no restaurant is open
+class _ClosedNowCard extends StatelessWidget {
+  const _ClosedNowCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: AppColors.dark, borderRadius: BorderRadius.circular(24)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('🌙', style: TextStyle(fontSize: 24)),
+          const SizedBox(height: 8),
+          Text(
+            'Everything is closed right now',
+            style: AppTextStyles.headline.copyWith(fontSize: 18, color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Check the list below to plan your next meal.',
+            style: AppTextStyles.body.copyWith(fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
+          ),
+        ],
       ),
     );
   }
