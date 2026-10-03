@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import '../widgets/occupancy_survey.dart';
+import '../services/occupancy_service.dart';
 import 'reviews_list_screen.dart';
 import 'write_review_screen.dart';
 
