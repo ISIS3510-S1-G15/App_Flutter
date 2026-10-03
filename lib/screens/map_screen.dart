@@ -5,6 +5,8 @@ import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
+import '../services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 import 'detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
@@ -17,6 +19,35 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   String _filter = 'all'; // 'all' | 'open'
   Restaurant? _selected;
+
+  // GPS state: the user's position (null until it is read), why it is unavailable, and if it is still loading
+  Position? _position;
+  String? _locationError;
+  bool _locating = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocation();
+  }
+
+  // Reads the GPS once when the screen opens (and again if the user taps "Retry")
+  Future<void> _loadLocation() async {
+    setState(() {
+      _locating = true;
+      _locationError = null;
+    });
+    final result = await LocationService.getCurrentLocation();
+    if (!mounted) return;
+    setState(() {
+      _locating = false;
+      _position = result.position;
+      _locationError = result.error;
+    });
+  }
+
+  double? _distanceTo(Restaurant r) =>
+      _position == null ? null : LocationService.distanceTo(_position!, r.latitude, r.longitude);
 
   // Changes the active filter and reports it to the analytics backend (BQ Type 2)
   void _onFilterTap(String filter, String label) {
@@ -31,9 +62,54 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  // "350 m · 5 min walk", or null when the location is unknown
+  String? _distanceLabel(Restaurant r) {
+    final d = _distanceTo(r);
+    if (d == null) return null;
+    return '${LocationService.formatDistance(d)} · ${LocationService.walkingMinutes(d)} min walk';
+  }
+
+  // Message above the list that adapts to the user's context: locating, no permission, off campus, or the closest open spot
+  Widget _buildLocationBanner() {
+    if (_locating) {
+      return const _LocationBanner(icon: Icons.my_location, text: 'Finding your location…');
+    }
+    if (_position == null) {
+      return _LocationBanner(
+        icon: Icons.location_off,
+        text: _locationError ?? 'Location unavailable',
+        actionLabel: 'Retry',
+        onAction: _loadLocation,
+      );
+    }
+    if (!LocationService.isOnCampus(_position!)) {
+      final d = LocationService.distanceTo(_position!, LocationService.campusLat, LocationService.campusLng);
+      return _LocationBanner(
+        icon: Icons.directions_walk,
+        text: "You're ${LocationService.formatDistance(d)} away from campus",
+      );
+    }
+    final open = restaurants.where((r) => r.isOpen).toList()
+      ..sort((a, b) => _distanceTo(a)!.compareTo(_distanceTo(b)!));
+    if (open.isEmpty) {
+      return const _LocationBanner(icon: Icons.near_me, text: 'No spots are open near you right now');
+    }
+    final closest = open.first;
+    return _LocationBanner(
+      icon: Icons.near_me,
+      text: 'Closest open spot: ${closest.name} · ${_distanceLabel(closest)}',
+      actionLabel: 'Show',
+      onAction: () => setState(() => _selected = closest),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final visible = _filter == 'all' ? restaurants : restaurants.where((r) => r.isOpen).toList();
+    final visible = _filter == 'all' ? restaurants.toList() : restaurants.where((r) => r.isOpen).toList();
+    // Context-aware: when the user's location is known, the closest spots go first
+    if (_position != null) {
+      visible.sort((a, b) => _distanceTo(a)!.compareTo(_distanceTo(b)!));
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -184,13 +260,19 @@ class _MapScreenState extends State<MapScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 children: [
-                  Text('Nearby — ${visible.length} spots', style: AppTextStyles.cardTitle.copyWith(fontSize: 14)),
+                  _buildLocationBanner(),
+                  const SizedBox(height: 12),
+                  Text(
+                    _position != null ? 'Closest to you — ${visible.length} spots' : 'Nearby — ${visible.length} spots',
+                    style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
+                  ),
                   const SizedBox(height: 12),
                   ...visible.map((r) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _QuickListItem(
                           restaurant: r,
                           selected: _selected?.id == r.id,
+                          distanceLabel: _distanceLabel(r),
                           onTap: () => setState(() => _selected = r),
                         ),
                       )),
@@ -319,9 +401,10 @@ class _SelectedCard extends StatelessWidget {
 class _QuickListItem extends StatelessWidget {
   final Restaurant restaurant;
   final bool selected;
+  final String? distanceLabel; // Shown only when the user's location is known
   final VoidCallback onTap;
 
-  const _QuickListItem({required this.restaurant, required this.selected, required this.onTap});
+  const _QuickListItem({required this.restaurant, required this.selected, this.distanceLabel, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -349,6 +432,8 @@ class _QuickListItem extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
                   Text('${r.waitTime} wait', style: TextStyle(fontSize: 11, color: AppColors.closed)),
+                  if (distanceLabel != null)
+                    Text(distanceLabel!, style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -446,4 +531,39 @@ class _CampusMapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _LocationBanner extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _LocationBanner({required this.icon, required this.text, this.actionLabel, this.onAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.accent),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+          if (actionLabel != null) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onAction,
+              child: Text(actionLabel!,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

@@ -20,6 +20,10 @@ class Restaurant {
   final double mapX;
   final double mapY;
 
+  // Real GPS coordinates, used to compute the distance from the user (defaults to the campus center)
+  final double latitude;
+  final double longitude;
+
   // Recent crowding reports (same 0-2 scale used by CrowdingBadge: 0 = not crowded, 2 = busy)
   final List<int> crowdingReports;
 
@@ -41,6 +45,8 @@ class Restaurant {
     this.menu = const [],
     this.mapX = 50,
     this.mapY = 50,
+    this.latitude = 4.6018,
+    this.longitude = -74.0661,
     this.crowdingReports = const [],
   });
 }

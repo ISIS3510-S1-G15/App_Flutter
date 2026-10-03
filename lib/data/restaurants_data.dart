@@ -20,6 +20,8 @@ final List<Restaurant> restaurants = [
         'The campus favorite for specialty coffee, house-made pastries, and a cozy atmosphere perfect for studying or catching up with friends.',
     mapX: 55,
     mapY: 25,
+    latitude: 4.6016,
+    longitude: -74.0658,
     crowdingReports: [1, 1, 2, 1, 0, 1],
     menu: [
       MenuSection(category: 'Drinks', items: [
@@ -51,6 +53,8 @@ final List<Restaurant> restaurants = [
         'Authentic ramen, pho, and pan-Asian noodle dishes made fresh daily. Student favorite for a warm, satisfying meal between classes.',
     mapX: 70,
     mapY: 55,
+    latitude: 4.6031,
+    longitude: -74.0672,
     crowdingReports: [0, 1, 0, 0, 1],
     menu: [
       MenuSection(category: 'Ramen', items: [
@@ -81,6 +85,8 @@ final List<Restaurant> restaurants = [
         'Cold-pressed juices, smoothie bowls, and protein shakes designed for active students. Everything is made to order.',
     mapX: 60,
     mapY: 35,
+    latitude: 4.6012,
+    longitude: -74.0679,
     crowdingReports: [2, 2, 1, 2, 2],
     menu: [
       MenuSection(category: 'Smoothies', items: [
@@ -107,6 +113,8 @@ final List<Restaurant> restaurants = [
         'Classic campus grill serving smash burgers, crinkle fries, and tasty breakfast. Popular post-game spot for the athletics crowd.',
     mapX: 20,
     mapY: 70,
+    latitude: 4.6024,
+    longitude: -74.0686,
     crowdingReports: [0, 0, 1, 0],
     menu: [
       MenuSection(category: 'Burgers', items: [
