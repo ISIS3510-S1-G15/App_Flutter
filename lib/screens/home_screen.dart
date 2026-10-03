@@ -3,7 +3,6 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../data/profile_data.dart';
 import '../models/restaurant.dart';
-import '../models/survey_answers.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/filter_chip.dart';
 import 'detail_screen.dart';
@@ -14,10 +13,7 @@ const _categories = ['All', 'Dining Hall', 'Café', 'Asian', 'Burgers', 'Indian'
 
 class HomeScreen extends StatefulWidget {
   // StatefulWidget because the screen changes when the user taps a category chip (it needs to remember which one is active)
-  final SurveyAnswers profile;
-
-  // Defaults to the shared mock profile (lib/data/profile_data.dart) until the survey produces a real one
-  const HomeScreen({super.key, this.profile = mockProfile});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -25,6 +21,23 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _activeCategory = 'All'; // Which category pill is currently selected
+
+  @override
+  void initState() {
+    // Runs ONLY once, when the screen is first created
+    super.initState();
+    userProfile.addListener(_onProfileChanged);
+    // Listens to the profile saved by the survey, so the greeting and avatar update if the user edits it
+  }
+
+  @override
+  void dispose() {
+    // Stops listening when the screen is destroyed (otherwise it would try to redraw a screen that no longer exists)
+    userProfile.removeListener(_onProfileChanged);
+    super.dispose();
+  }
+
+  void _onProfileChanged() => setState(() {}); // Redraws the screen with the new profile
 
   List<Restaurant> get _filtered {
     // Restaurants that belong to the active category (or all of them if 'All' is selected)
@@ -42,13 +55,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onOpenProfile() {
     // Called when the user taps the avatar in the header. Pushes the profile on top so its back button returns here
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ProfileScreen(profile: widget.profile)),
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final profile = widget.profile;
+    final profile = userProfile.value; // The profile created by the survey (name used for the greeting and avatar)
     final filtered = _filtered;
     final featured = restaurants.first; // "Today's Pick" is always the first restaurant of the list
 

@@ -2,28 +2,33 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/survey_answers.dart';
 import '../data/profile_data.dart';
+import '../widgets/progress_bar.dart';
+import 'survey_screen.dart';
 
 // Colors used only in this screen (everything else comes from AppColors)
 const _greenBg = Color(0xFFE8F5EB);     // dietary restriction chip background
-const _greenText = Color(0xFF3A8C4F);   // dietary restriction chip text
 const _greenBorder = Color(0xFFC5E0CB); // dietary restriction chip border
 
 // Number of survey fields counted towards "Profile completeness"
 const _totalFields = 6;
 
 class ProfileScreen extends StatelessWidget {
-  // StatelessWidget because this screen only displays the profile it receives (no state of its own)
-  final SurveyAnswers profile;
+  // StatelessWidget because this screen only displays the profile saved by the survey (no state of its own)
 
-  // What the back button does. MainNavigation passes a callback thatswitches back to the previous tab. 
+  // What the back button does. MainNavigation passes a callback thatswitches back to the previous tab.
   // If this screen is pushed as a route instead, the back button pops the route.
   final VoidCallback? onBack;
 
-  // Defaults to the shared mock profile (lib/data/profile_data.dart) until the survey produces a real one
-  const ProfileScreen({super.key, this.profile = mockProfile, this.onBack});
+  const ProfileScreen({super.key, this.onBack});
 
-  void _onRetakeSurvey() {
-    // TODO: Navigator.push a SurveyScreen so the user can answer the survey again
+  void _onRetakeSurvey(BuildContext context) {
+    // Opens the survey again (pre-filled with the current answers). When it is saved, userProfile changes,
+    // this screen redraws with the new data, and the survey closes itself returning here
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SurveyScreen(onComplete: () => Navigator.of(context).pop()),
+      ),
+    );
   }
 
   void _handleBack(BuildContext context) {
@@ -37,6 +42,14 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Listens to the profile saved by the survey: every time it changes, the builder runs again with the new answers
+    return ValueListenableBuilder<SurveyAnswers>(
+      valueListenable: userProfile,
+      builder: (context, profile, _) => _buildContent(context, profile),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, SurveyAnswers profile) {
     // First two letters of the name shown in the avatar; "ME" if there is no name yet
     final initials = profile.name.isNotEmpty ? profile.name.substring(0, 2).toUpperCase() : 'ME';
 
@@ -69,7 +82,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   Text('My Profile', style: AppTextStyles.headline.copyWith(fontSize: 17)),
                   GestureDetector(
-                    onTap: _onRetakeSurvey,
+                    onTap: () => _onRetakeSurvey(context),
                     child: Text(
                       'Edit',
                       style: AppTextStyles.body.copyWith(
@@ -151,18 +164,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   // Progress bar: grey track with an orange fill whose width is the completeness percentage
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: Container(
-                      height: 6,
-                      color: Colors.white.withOpacity(0.1),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: progress,
-                        child: Container(color: AppColors.accent),
-                      ),
-                    ),
-                  ),
+                  AppProgressBar(progress: progress, trackColor: Colors.white.withOpacity(0.1)),
                 ],
               ),
             ),
@@ -215,7 +217,7 @@ class ProfileScreen extends StatelessWidget {
                       .map((d) => _Chip(
                             label: '✓ $d',
                             background: _greenBg,
-                            textColor: _greenText,
+                            textColor: AppColors.green,
                             borderColor: _greenBorder,
                           ))
                       .toList(),
@@ -317,7 +319,7 @@ class ProfileScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               child: InkWell(
-                onTap: _onRetakeSurvey,
+                onTap: () => _onRetakeSurvey(context),
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   height: 48,

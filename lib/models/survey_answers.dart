@@ -1,5 +1,5 @@
 // Defines the answers a user gives in the food preferences survey
-// ProfileScreen reads this to display the profile; in the future SurveyScreen will produce it
+// SurveyScreen produces it, and ProfileScreen / HomeScreen read it to show the user's profile
 class SurveyAnswers {
   final String name;
   final List<String> cuisines;
@@ -20,4 +20,28 @@ class SurveyAnswers {
     this.priorities = const [],
     this.dislikedFoods = '',
   });
+
+  // Returns a copy of these answers changing only the fields that are passed
+  // (the fields are final, so the survey creates a new object every time the user answers something)
+  SurveyAnswers copyWith({
+    String? name,
+    List<String>? cuisines,
+    List<String>? dietaryRestrictions,
+    String? mealFrequency,
+    List<String>? mealTimes,
+    String? budget,
+    List<String>? priorities,
+    String? dislikedFoods,
+  }) {
+    return SurveyAnswers(
+      name: name ?? this.name,
+      cuisines: cuisines ?? this.cuisines,
+      dietaryRestrictions: dietaryRestrictions ?? this.dietaryRestrictions,
+      mealFrequency: mealFrequency ?? this.mealFrequency,
+      mealTimes: mealTimes ?? this.mealTimes,
+      budget: budget ?? this.budget,
+      priorities: priorities ?? this.priorities,
+      dislikedFoods: dislikedFoods ?? this.dislikedFoods,
+    );
+  }
 }

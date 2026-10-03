@@ -12,6 +12,8 @@ class AppColors {
   static const borderLight = Color(0xFFF0E8DE); // borde más suave para filas y tarjetas de lista
   static const muted = Color(0xFF7A6D5F);       // texto secundario (ubicación, etiquetas, precio)
   static const mutedLight = Color(0xFFB8AC9E);  // texto terciario (separadores "·", conteo de reseñas)
+  static const green = Color(0xFF3A8C4F);       // restricciones alimentarias (chips del perfil y de la encuesta)
+  static const amber = Color(0xFFF4A735);       // opciones seleccionadas de horarios de comida en la encuesta
 }
 
 class AppTextStyles {
