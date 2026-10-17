@@ -117,11 +117,11 @@ class _DetailScreenState extends State<DetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                       decoration: BoxDecoration(
-                        color: r.isOpen ? AppColors.open : AppColors.closed,
+                        color: r.isOpenNow ? AppColors.open : AppColors.closed,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        r.isOpen ? 'OPEN NOW' : 'CLOSED',
+                        r.isOpenNow ? 'OPEN NOW' : 'CLOSED',
                         style: const TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,

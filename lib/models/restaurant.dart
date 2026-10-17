@@ -1,4 +1,5 @@
 // Defines what information each restaurant has (name, category, rating, etc.)
+import '../utils/meal_context.dart';
 class Restaurant {
   final String id;
   final String name;
@@ -49,6 +50,8 @@ class Restaurant {
     this.longitude = -74.0661,
     this.crowdingReports = const [],
   });
+
+  bool get isOpenNow => isOpenAt(this, DateTime.now());
 }
 
 class MenuSection {

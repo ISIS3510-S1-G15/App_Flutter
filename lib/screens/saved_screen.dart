@@ -23,7 +23,7 @@ class SavedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Filters the full restaurant list into three groups used across this screen
     final saved = restaurants.where((r) => r.saved).toList();
-    final openNow = restaurants.where((r) => r.isOpen).take(3).toList();
+    final openNow = restaurants.where((r) => r.isOpenNow).take(3).toList();
     final recentlyViewed = restaurants.where((r) => !r.saved).take(4).toList();
 
     return Scaffold(
@@ -228,13 +228,13 @@ class SavedScreen extends StatelessWidget {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: r.isOpen
+                                    color: r.isOpenNow
                                         ? AppColors.open
                                         : AppColors.dark.withOpacity(0.6),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
-                                    r.isOpen ? 'Open' : 'Closed',
+                                    r.isOpenNow ? 'Open' : 'Closed',
                                     style: const TextStyle(
                                       fontSize: 8,
                                       fontWeight: FontWeight.bold,
@@ -379,15 +379,15 @@ class _SavedCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: (r.isOpen ? AppColors.open : AppColors.closed).withOpacity(0.12),
+                          color: (r.isOpenNow ? AppColors.open : AppColors.closed).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          r.isOpen ? 'Open' : 'Closed',
+                          r.isOpenNow ? 'Open' : 'Closed',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: r.isOpen ? AppColors.open : AppColors.closed,
+                            color: r.isOpenNow ? AppColors.open : AppColors.closed,
                           ),
                         ),
                       ),

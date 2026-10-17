@@ -135,7 +135,7 @@ class _MapScreenState extends State<MapScreen> {
         text: "You're ${LocationService.formatDistance(d)} away from campus",
       );
     }
-    final open = restaurants.where((r) => r.isOpen).toList()
+    final open = restaurants.where((r) => r.isOpenNow).toList()
       ..sort((a, b) => _distanceTo(a)!.compareTo(_distanceTo(b)!));
     if (open.isEmpty) {
       return const _LocationBanner(icon: Icons.near_me, text: 'No spots are open near you right now');
@@ -158,7 +158,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final visible = _filter == 'all' ? restaurants.toList() : restaurants.where((r) => r.isOpen).toList();
+    final visible = _filter == 'all' ? restaurants.toList() : restaurants.where((r) => r.isOpenNow).toList();
     // Context-aware: when the user's location is known, the closest spots go first
     if (_position != null) {
       visible.sort((a, b) => _distanceTo(a)!.compareTo(_distanceTo(b)!));
@@ -268,7 +268,7 @@ class _MapScreenState extends State<MapScreen> {
                                           decoration: BoxDecoration(
                                             color: isSelected
                                                 ? AppColors.accent
-                                                : (r.isOpen ? AppColors.dark : AppColors.closed),
+                                                : (r.isOpenNow ? AppColors.dark : AppColors.closed),
                                             shape: BoxShape.circle,
                                             border: Border.all(color: Colors.white, width: 2),
                                             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)],
@@ -438,15 +438,15 @@ class _SelectedCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: (r.isOpen ? AppColors.open : AppColors.closed).withOpacity(0.12),
+                          color: (r.isOpenNow ? AppColors.open : AppColors.closed).withOpacity(0.12),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          r.isOpen ? 'Open' : 'Closed',
+                          r.isOpenNow ? 'Open' : 'Closed',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
-                            color: r.isOpen ? AppColors.open : AppColors.closed,
+                            color: r.isOpenNow ? AppColors.open : AppColors.closed,
                           ),
                         ),
                       ),
@@ -519,15 +519,15 @@ class _QuickListItem extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: (r.isOpen ? AppColors.open : AppColors.closed).withOpacity(0.12),
+                color: (r.isOpenNow ? AppColors.open : AppColors.closed).withOpacity(0.12),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                r.isOpen ? 'Open' : 'Closed',
+                r.isOpenNow ? 'Open' : 'Closed',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: r.isOpen ? AppColors.open : AppColors.closed,
+                  color: r.isOpenNow ? AppColors.open : AppColors.closed,
                 ),
               ),
             ),

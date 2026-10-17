@@ -364,7 +364,7 @@ class _RestaurantCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = restaurant;
-    final statusColor = r.isOpen ? AppColors.open : AppColors.muted;
+    final statusColor = r.isOpenNow ? AppColors.open : AppColors.muted;
 
     return InkWell(
       onTap: onTap, // Makes the entire card tappable (with a "ripple" effect when tapped)
@@ -438,7 +438,7 @@ class _RestaurantCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              r.isOpen ? 'OPEN' : 'CLOSED',
+                              r.isOpenNow ? 'OPEN' : 'CLOSED',
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,

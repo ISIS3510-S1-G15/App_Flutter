@@ -419,11 +419,11 @@ class _SearchResultRow extends StatelessWidget {
                       Text('·', style: TextStyle(color: AppColors.closed)),
                       const SizedBox(width: 4),
                       Text(
-                        r.isOpen ? 'Open' : 'Closed',
+                        r.isOpenNow ? 'Open' : 'Closed',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color: r.isOpen ? AppColors.open : AppColors.closed,
+                          color: r.isOpenNow ? AppColors.open : AppColors.closed,
                         ),
                       ),
                       const SizedBox(width: 4),
