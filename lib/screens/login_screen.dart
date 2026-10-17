@@ -39,7 +39,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!email.endsWith('@uniandes.edu.co') || email.startsWith('@')) {
       return 'Use your institutional email (@uniandes.edu.co)';
     }
-    if (_password.text.length < 8) return 'The password must have at least 8 characters';
+    final password = _password.text;
+    if (password.length < 8) return 'The password must have at least 8 characters';
+    // Only new accounts need the stronger rule, so existing users can still log in
+    if (_isRegister &&
+        (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+            !RegExp(r'\d').hasMatch(password) ||
+            !RegExp(r'[^A-Za-z0-9\s]').hasMatch(password))) {
+      return 'The password needs at least one letter, one number and one special character (* . ! @ # ...)';
+    }
     return null;
   }
 
@@ -107,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 12),
             _AuthField(
               controller: _password,
-              hint: 'Password (min. 8 characters)',
+              hint: 'Password (min. 8 characters, letter, number, symbol)',
               icon: Icons.lock_outline,
               obscure: _hidePassword,
               suffix: IconButton(

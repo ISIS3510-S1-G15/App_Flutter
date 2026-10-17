@@ -102,25 +102,28 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'UNIVERSIDAD DE LOS ANDES',
-                        style: AppTextStyles.body.copyWith(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.accent,
-                          letterSpacing: 1.5,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'UNIVERSIDAD DE LOS ANDES',
+                          style: AppTextStyles.body.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.accent,
+                            letterSpacing: 1.5,
+                          ),
                         ),
-                      ),
-                      Text(
-                        // Greets the user by name if the survey has one; otherwise shows the app name
-                        profile.name.isNotEmpty ? '${greetingFor(now)}, ${profile.name} 👋' : 'Campus Eats',
-                        style: AppTextStyles.headline.copyWith(fontSize: 26, height: 1.2),
-                      ),
-                    ],
+                        Text(
+                          // Greets the user by name if the survey has one; otherwise shows the app name
+                          profile.name.isNotEmpty ? '${greetingFor(now)}, ${profile.name} 👋' : 'Campus Eats',
+                          style: AppTextStyles.headline.copyWith(fontSize: 26, height: 1.2),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 12), // space so the text never touches the avatar
                   // Dark round button: user's initials if there is a name, otherwise a person icon
                   InkWell(
                     onTap: _onOpenProfile,
