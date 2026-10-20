@@ -8,6 +8,7 @@ import '../widgets/app_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/success_check.dart';
 import '../services/onboarding_analytics.dart';
+import '../services/survey_analytics.dart';
 
 // Number of steps (pages) of the survey
 const _totalSteps = 5;
@@ -58,11 +59,18 @@ class _SurveyScreenState extends State<SurveyScreen> {
   // Session of this run of the survey, used by the analytics backend (BQ Type 2)
   final _sessionId = OnboardingAnalytics.newSessionId();
 
+  // Pages the user left without answering (1-based), so "completed" only counts full answers (SurveyAnalytics)
+  final Set<int> _skippedSteps = {};
+
   @override
   void initState() {
     super.initState();
     // Only the first-time onboarding counts for the completion rate, not "Retake survey" from the profile
     if (widget.isOnboarding) OnboardingAnalytics.logEvent(_sessionId, 'started', 1);
+    if (widget.isOnboarding) {
+      SurveyAnalytics.log('started');
+      SurveyAnalytics.log('step_viewed', step: 1);
+    }
   }
 
   @override
@@ -89,10 +97,18 @@ class _SurveyScreenState extends State<SurveyScreen> {
   void _next() {
     // "Continue" goes to the next step; on the last step "Save Preferences" saves the profile
     FocusScope.of(context).unfocus(); // Closes the keyboard if a text field was open
+    if (widget.isOnboarding) {
+      if (_answeredStep(_step)) {
+        _skippedSteps.remove(_step + 1); // Came back and answered it after all
+      } else if (_skippedSteps.add(_step + 1)) {
+        SurveyAnalytics.log('skipped', step: _step + 1); // Only once per page
+      }
+    }
     if (_step < _totalSteps - 1) {
       setState(() => _step++);
       // Reports the step the user reached (1-based), to see where users drop off
       if (widget.isOnboarding) OnboardingAnalytics.logEvent(_sessionId, 'step', _step + 1);
+      if (widget.isOnboarding) SurveyAnalytics.log('step_viewed', step: _step + 1);
     } else {
       _save();
     }
@@ -103,11 +119,22 @@ class _SurveyScreenState extends State<SurveyScreen> {
     if (_step > 0) setState(() => _step--);
   }
 
+  // True if the user picked/wrote at least one answer in that page (false = pressed Continue without choosing)
+  bool _answeredStep(int step) => switch (step) {
+        0 => _answers.cuisines.isNotEmpty,
+        1 => _answers.dietaryRestrictions.isNotEmpty,
+        2 => _answers.mealTimes.isNotEmpty || _answers.mealFrequency.isNotEmpty,
+        3 => _answers.budget.isNotEmpty,
+        _ => _answers.priorities.isNotEmpty || _answers.dislikedFoods.trim().isNotEmpty,
+      };
+
   Future<void> _save() async {
     // Saves the answers as the user's profile. Every screen listening to userProfile (Home, Profile) redraws
     userProfile.value = _answers.copyWith(name: _answers.name.trim(), dislikedFoods: _answers.dislikedFoods.trim());
     setState(() => _done = true);
     if (widget.isOnboarding) OnboardingAnalytics.logEvent(_sessionId, 'completed', _totalSteps);
+    // Completed = reached the end AND answered every page
+    if (widget.isOnboarding && _skippedSteps.isEmpty) SurveyAnalytics.log('completed');
 
     // Shows the "¡Listo!" confirmation for a moment before moving on
     await Future.delayed(const Duration(milliseconds: 1500));
