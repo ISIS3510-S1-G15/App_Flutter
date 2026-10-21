@@ -44,6 +44,10 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
     <!-- Needed to talk to the backend (analytics and authentication) -->
     <uses-permission android:name="android.permission.INTERNET"/>

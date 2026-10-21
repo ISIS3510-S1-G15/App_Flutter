@@ -4,6 +4,8 @@ import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/occupancy_survey.dart';
 import '../services/occupancy_service.dart';
+import '../services/occupancy_check_analytics.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'reviews_list_screen.dart';
 import 'write_review_screen.dart';
 
@@ -20,6 +22,7 @@ class _DetailScreenState extends State<DetailScreen> {
   late bool _saved = widget.restaurant.saved;
   int _activeMenu = 0;
   List<int> _liveReports = [];
+  bool _checkLogged = false; // The occupancy check is logged once per visit to this screen
 
   @override
   void initState() {
@@ -31,6 +34,11 @@ class _DetailScreenState extends State<DetailScreen> {
     final reports = await OccupancyService.getReports(widget.restaurant.id);
     if (mounted) {
       setState(() => _liveReports = reports);
+      // The indicator is now on screen: counts as checking the occupancy (once per visit)
+      if (!_checkLogged) {
+        _checkLogged = true;
+        OccupancyCheckAnalytics.logCheck(widget.restaurant.id, hasData: _liveReports.isNotEmpty);
+      }
     }
   }
 
@@ -46,6 +54,21 @@ class _DetailScreenState extends State<DetailScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ReviewsListScreen(restaurant: widget.restaurant)),
     );
+  }
+
+  Future<void> _onGetDirections() async {
+    // Tapping "Get directions" is the user's decision to go (BQ: did they check the occupancy first?)
+    final r = widget.restaurant;
+    OccupancyCheckAnalytics.logGoDecision(r.id);
+    final url = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}&travelmode=walking');
+    var opened = false;
+    try {
+      opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open the map')));
+    }
   }
 
   @override
@@ -265,6 +288,17 @@ class _DetailScreenState extends State<DetailScreen> {
                   },
                   icon: const Icon(Icons.people_outline, size: 16),
                   label: const Text('Report crowding level'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.closed.withOpacity(0.3)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _onGetDirections,
+                  icon: const Icon(Icons.directions_walk, size: 16),
+                  label: const Text('Get directions'),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: AppColors.closed.withOpacity(0.3)),
                     padding: const EdgeInsets.symmetric(vertical: 13),
