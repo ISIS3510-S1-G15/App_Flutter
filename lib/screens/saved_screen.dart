@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import '../services/saved_service.dart';
 import 'detail_screen.dart';
 
 // The person's saved dietary preferences (currently hardcoded; in the future, these will come from the onboarding survey or user profile)
@@ -21,10 +22,18 @@ class SavedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Redraws the screen every time the user's saved list changes (loaded from the backend or toggled in a detail)
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: SavedService.savedIds,
+      builder: (context, savedIds, _) => _buildContent(context, savedIds),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, Set<String> savedIds) {
     // Filters the full restaurant list into three groups used across this screen
-    final saved = restaurants.where((r) => r.saved).toList();
+    final saved = restaurants.where((r) => savedIds.contains(r.id)).toList();
     final openNow = restaurants.where((r) => r.isOpenNow).take(3).toList();
-    final recentlyViewed = restaurants.where((r) => !r.saved).take(4).toList();
+    final recentlyViewed = restaurants.where((r) => !savedIds.contains(r.id)).take(4).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -43,16 +52,6 @@ class SavedScreen extends StatelessWidget {
                     Text('${saved.length} spots saved',
                         style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.closed)),
                   ],
-                ),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.closed.withOpacity(0.3)),
-                  ),
-                  child: const Icon(Icons.add, size: 18, color: AppColors.dark),
                 ),
               ],
             ),

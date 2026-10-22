@@ -56,6 +56,18 @@ class ApiClient {
     return _decode(response);
   }
 
+  // PUT without a body (e.g. save a restaurant) and return the decoded JSON answer
+  Future<dynamic> putJson(String path) async {
+    final response = await _http.put(_uri(path), headers: _headers()).timeout(timeout);
+    return _decode(response);
+  }
+
+  // DELETE a path and return the decoded JSON answer
+  Future<dynamic> deleteJson(String path) async {
+    final response = await _http.delete(_uri(path), headers: _headers()).timeout(timeout);
+    return _decode(response);
+  }
+
   dynamic _decode(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(response.statusCode, response.body);

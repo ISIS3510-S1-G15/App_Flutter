@@ -5,6 +5,7 @@ import 'screens/search_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/profile_screen.dart';
+import 'services/saved_service.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -33,6 +34,12 @@ class _MainNavigationState extends State<MainNavigation> {
       _previousIndex = _selectedIndex;
       _selectedIndex = index;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    SavedService.load(); // the user's saved restaurants, from the backend
   }
 
   @override

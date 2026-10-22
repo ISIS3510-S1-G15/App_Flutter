@@ -11,6 +11,7 @@ import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import 'detail_screen.dart';
 import 'profile_screen.dart';
+import '../services/saved_service.dart';
 
 // Category pills shown under "Today's Pick". 'All' shows every restaurant
 const _categories = ['All', 'Dining Hall', 'Café', 'Asian', 'Burgers', 'Indian', 'Smoothies'];
@@ -396,7 +397,7 @@ class _RestaurantCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(color: AppColors.closed.withOpacity(0.3)),
                     ),
-                    if (r.saved)
+                    if (SavedService.isSaved(r.id))
                       Positioned(
                         top: 8,
                         right: 8,

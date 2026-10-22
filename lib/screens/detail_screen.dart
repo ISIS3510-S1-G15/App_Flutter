@@ -8,6 +8,7 @@ import '../services/occupancy_check_analytics.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'reviews_list_screen.dart';
 import 'write_review_screen.dart';
+import '../services/saved_service.dart';
 
 class DetailScreen extends StatefulWidget {
   final Restaurant restaurant;
@@ -19,7 +20,8 @@ class DetailScreen extends StatefulWidget {
 }
 
 class _DetailScreenState extends State<DetailScreen> {
-  late bool _saved = widget.restaurant.saved;
+  // Saved state comes from the backend (SavedService), not from the fixed "saved" field of the restaurant
+  bool get _saved => SavedService.isSaved(widget.restaurant.id);
   int _activeMenu = 0;
   List<int> _liveReports = [];
   bool _checkLogged = false; // The occupancy check is logged once per visit to this screen
@@ -28,6 +30,23 @@ class _DetailScreenState extends State<DetailScreen> {
   void initState() {
     super.initState();
     _loadReports();
+    SavedService.savedIds.addListener(_onSavedChanged);
+  }
+
+  @override
+  void dispose() {
+    SavedService.savedIds.removeListener(_onSavedChanged);
+    super.dispose();
+  }
+
+  void _onSavedChanged() => setState(() {}); // Redraws the bookmark when the saved list changes
+
+  Future<void> _onToggleSaved() async {
+    // The icon changes right away; if the server can't be reached it goes back and the user is told
+    final ok = await SavedService.toggle(widget.restaurant.id);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not update your saved spots')));
+    }
   }
 
   Future<void> _loadReports() async {
@@ -126,7 +145,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       _CircleButton(
                         icon: _saved ? Icons.bookmark : Icons.bookmark_border,
                         iconColor: _saved ? AppColors.accent : AppColors.dark,
-                        onTap: () => setState(() => _saved = !_saved),
+                        onTap: _onToggleSaved,
                       ),
                     ],
                   ),
