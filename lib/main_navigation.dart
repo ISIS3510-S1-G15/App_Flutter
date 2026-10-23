@@ -6,6 +6,7 @@ import 'screens/map_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/profile_screen.dart';
 import 'services/saved_service.dart';
+import 'services/profile_service.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -40,6 +41,7 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     SavedService.load(); // the user's saved restaurants, from the backend
+    ProfileService.load(); // the user's survey answers, from the backend
   }
 
   @override

@@ -5,9 +5,8 @@ import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../services/saved_service.dart';
 import 'detail_screen.dart';
+import '../data/profile_data.dart';
 
-// The person's saved dietary preferences (currently hardcoded; in the future, these will come from the onboarding survey or user profile)
-const _userDietaryPreferences = ['Vegan', 'Vegetarian'];
 
 class SavedScreen extends StatelessWidget {
   // StatelessWidget because this screen doesn't manage its own changing state (displays saved data)
@@ -34,6 +33,7 @@ class SavedScreen extends StatelessWidget {
     final saved = restaurants.where((r) => savedIds.contains(r.id)).toList();
     final openNow = restaurants.where((r) => r.isOpenNow).take(3).toList();
     final recentlyViewed = restaurants.where((r) => !savedIds.contains(r.id)).take(4).toList();
+    final dietaryPreferences = userProfile.value.dietaryRestrictions.where((d) => d != 'None').toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -61,7 +61,7 @@ class SavedScreen extends StatelessWidget {
             // Plain text only
             Text('Dietary Preferences', style: AppTextStyles.cardTitle.copyWith(fontSize: 13)),
             const SizedBox(height: 8),
-            if (_userDietaryPreferences.isEmpty)
+            if (dietaryPreferences.isEmpty)
               // Fallback text shown if the user hasn't set any preferences yet
               Text(
                 'No dietary preferences set',
@@ -72,7 +72,7 @@ class SavedScreen extends StatelessWidget {
                 // Wrap lets the text items flow to a new line automatically if there are many
                 spacing: 6,
                 runSpacing: 6,
-                children: _userDietaryPreferences
+                children: dietaryPreferences
                     .map((d) => Text(
                           '${_dietEmoji(d)} $d',
                           style: AppTextStyles.body.copyWith(

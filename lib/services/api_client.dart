@@ -56,9 +56,15 @@ class ApiClient {
     return _decode(response);
   }
 
-  // PUT without a body (e.g. save a restaurant) and return the decoded JSON answer
-  Future<dynamic> putJson(String path) async {
-    final response = await _http.put(_uri(path), headers: _headers()).timeout(timeout);
+  // PUT with an optional JSON body (e.g. save a restaurant, save the profile) and return the decoded JSON answer
+  Future<dynamic> putJson(String path, {Map<String, dynamic>? body}) async {
+    final response = await _http
+        .put(
+          _uri(path),
+          headers: _headers(json: body != null),
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(timeout);
     return _decode(response);
   }
 

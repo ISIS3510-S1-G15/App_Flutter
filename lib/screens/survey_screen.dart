@@ -8,6 +8,7 @@ import '../widgets/app_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/success_check.dart';
 import '../services/onboarding_analytics.dart';
+import '../services/profile_service.dart';
 
 // Number of steps (pages) of the survey
 const _totalSteps = 5;
@@ -106,6 +107,7 @@ class _SurveyScreenState extends State<SurveyScreen> {
   Future<void> _save() async {
     // Saves the answers as the user's profile. Every screen listening to userProfile (Home, Profile) redraws
     userProfile.value = _answers.copyWith(name: _answers.name.trim(), dislikedFoods: _answers.dislikedFoods.trim());
+    ProfileService.save(userProfile.value);
     setState(() => _done = true);
     if (widget.isOnboarding) OnboardingAnalytics.logEvent(_sessionId, 'completed', _totalSteps);
 

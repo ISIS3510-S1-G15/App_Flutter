@@ -44,4 +44,28 @@ class SurveyAnswers {
       dislikedFoods: dislikedFoods ?? this.dislikedFoods,
     );
   }
+
+  // Converts the answers to JSON to send them to the backend (PUT /me/profile).
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'cuisines': cuisines,
+        'dietary_restrictions': dietaryRestrictions,
+        'meal_frequency': mealFrequency,
+        'meal_times': mealTimes,
+        'budget': budget,
+        'priorities': priorities,
+        'disliked_foods': dislikedFoods,
+      };
+
+  // Builds the answers from the JSON the backend returns (GET /me/profile).
+  factory SurveyAnswers.fromJson(Map<String, dynamic> json) => SurveyAnswers(
+        name: json['name'] as String? ?? '',
+        cuisines: (json['cuisines'] as List? ?? []).cast<String>(),
+        dietaryRestrictions: (json['dietary_restrictions'] as List? ?? []).cast<String>(),
+        mealFrequency: json['meal_frequency'] as String? ?? '',
+        mealTimes: (json['meal_times'] as List? ?? []).cast<String>(),
+        budget: json['budget'] as String? ?? '',
+        priorities: (json['priorities'] as List? ?? []).cast<String>(),
+        dislikedFoods: json['disliked_foods'] as String? ?? '',
+      );
 }
