@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/occupancy_survey.dart';
 import '../services/occupancy_service.dart';
+import '../services/review_service.dart';
 import '../services/occupancy_check_analytics.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'reviews_list_screen.dart';
@@ -24,24 +26,37 @@ class _DetailScreenState extends State<DetailScreen> {
   // Saved state comes from the backend (SavedService), not from the fixed "saved" field of the restaurant
   bool get _saved => SavedService.isSaved(widget.restaurant.id);
   int _activeMenu = 0;
-  List<int> _liveReports = [];
   bool _checkLogged = false; // The occupancy check is logged once per visit to this screen
+
+  // Asks the backend again for the occupancy while the screen is open, so "real time" means
+  // "at most 30 s old". A shorter period spends more battery and data for a value that rarely changes faster
+  static const _pollEvery = Duration(seconds: 30);
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     RestaurantViewAnalytics.logView(widget.restaurant.id); // BQ Type 3: every time the detail is opened
-    _loadReports();
-    SavedService.savedIds.addListener(_onSavedChanged);
+    _refreshOccupancy();
+    _pollTimer = Timer.periodic(_pollEvery, (_) => _refreshOccupancy());
+    // The screen redraws when any of the data it shows changes (bookmark, crowding, rating)
+    SavedService.savedIds.addListener(_onDataChanged);
+    OccupancyService.statuses.addListener(_onDataChanged);
+    ReviewService.summaries.addListener(_onDataChanged);
   }
 
   @override
   void dispose() {
-    SavedService.savedIds.removeListener(_onSavedChanged);
+    _pollTimer?.cancel(); // without this the timer would keep calling the backend after leaving the screen
+    SavedService.savedIds.removeListener(_onDataChanged);
+    OccupancyService.statuses.removeListener(_onDataChanged);
+    ReviewService.summaries.removeListener(_onDataChanged);
     super.dispose();
   }
 
-  void _onSavedChanged() => setState(() {}); // Redraws the bookmark when the saved list changes
+  void _onDataChanged() {
+    if (mounted) setState(() {});
+  }
 
   Future<void> _onToggleSaved() async {
     // The icon changes right away; if the server can't be reached it goes back and the user is told
@@ -51,15 +66,13 @@ class _DetailScreenState extends State<DetailScreen> {
     }
   }
 
-  Future<void> _loadReports() async {
-    final reports = await OccupancyService.getReports(widget.restaurant.id);
-    if (mounted) {
-      setState(() => _liveReports = reports);
-      // The indicator is now on screen: counts as checking the occupancy (once per visit)
-      if (!_checkLogged) {
-        _checkLogged = true;
-        OccupancyCheckAnalytics.logCheck(widget.restaurant.id, hasData: _liveReports.isNotEmpty);
-      }
+  Future<void> _refreshOccupancy() async {
+    // Updates OccupancyService.statuses; the listener above redraws the card (and the badges of other screens)
+    final status = await OccupancyService.refresh(widget.restaurant.id);
+    // The indicator is now on screen: counts as checking the occupancy (once per visit)
+    if (mounted && !_checkLogged) {
+      _checkLogged = true;
+      OccupancyCheckAnalytics.logCheck(widget.restaurant.id, hasData: status.hasData);
     }
   }
 
@@ -95,9 +108,8 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     final r = widget.restaurant;
-    final crowdAvg = _liveReports.isEmpty
-        ? null
-        : _liveReports.reduce((a, b) => a + b) / _liveReports.length;
+    final occupancy = OccupancyService.statusOf(r.id); // same data the badges of Home/Map/Search/Saved use
+    final rating = ReviewService.summaryOf(r.id);      // calculated by the backend from the real reviews
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -230,11 +242,10 @@ class _DetailScreenState extends State<DetailScreen> {
                               children: [
                                 Icon(Icons.star, size: 14, color: AppColors.accent),
                                 const SizedBox(width: 3),
-                                Text('${r.rating}',
-                                    style: AppTextStyles.cardTitle.copyWith(fontSize: 15)),
+                                Text(rating.label, style: AppTextStyles.cardTitle.copyWith(fontSize: 15)),
                               ],
                             ),
-                            label: '${r.reviews} reviews',
+                            label: '${rating.count} review${rating.count != 1 ? 's' : ''}',
                           ),
                           _StatDivider(),
                           _StatColumn(
@@ -297,15 +308,15 @@ class _DetailScreenState extends State<DetailScreen> {
 
                 // ---------- Crowding ----------
                 const SizedBox(height: 12),
-                if (crowdAvg != null)
-                  _CrowdingCard(avg: crowdAvg, reports: _liveReports)
+                if (occupancy.hasData)
+                  _CrowdingCard(restaurantId: r.id, status: occupancy)
                 else
                   _EmptyCrowdingCard(),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: () async {
+                    // The backend answers the report with the new status, so the card updates by itself
                     await OccupancySurvey.show(context, r.id, r.name);
-                    _loadReports(); // refresh the card right after reporting
                   },
                   icon: const Icon(Icons.people_outline, size: 16),
                   label: const Text('Report crowding level'),
@@ -412,7 +423,7 @@ class _DetailScreenState extends State<DetailScreen> {
                     children: [
                       Icon(Icons.star, size: 16, color: AppColors.accent),
                       const SizedBox(width: 8),
-                      Text('See ${r.reviews} Reviews', style: AppTextStyles.button.copyWith(color: AppColors.dark)),
+                      Text(rating.count == 0 ? 'No reviews yet' : 'See ${rating.count} Review${rating.count != 1 ? 's' : ''}', style: AppTextStyles.button.copyWith(color: AppColors.dark)),
                     ],
                   ),
                 ),
@@ -495,25 +506,24 @@ class _StatDivider extends StatelessWidget {
 
 // Card showing how crowded the place is right now, based on recent reports (0-2 scale, same as CrowdingBadge)
 class _CrowdingCard extends StatelessWidget {
-  final double avg;
-  final List<int> reports;
+  final String restaurantId;
+  final OccupancyStatus status; // only built when status.hasData is true
 
-  const _CrowdingCard({required this.avg, required this.reports});
+  const _CrowdingCard({required this.restaurantId, required this.status});
+
+  // "just now", "5 min ago": tells the user how fresh the value is (it can be an older, cached one if offline)
+  String get _updatedAgo {
+    final minutes = DateTime.now().difference(status.lastReportAt!).inMinutes;
+    return minutes < 1 ? 'just now' : '$minutes min ago';
+  }
 
   @override
   Widget build(BuildContext context) {
-    late String label;
-    late Color color;
-    if (avg < 0.7) {
-      label = 'Not crowded';
-      color = AppColors.open;
-    } else if (avg < 1.4) {
-      label = 'Moderate';
-      color = AppColors.accent;
-    } else {
-      label = 'Busy';
-      color = AppColors.closed;
-    }
+    final avg = status.level!;
+    final reports = status.reports;
+    final style = crowdingStyle(avg); // same thresholds as CrowdingBadge (defined only once)
+    final label = style.label;
+    final color = style.color;
 
     // Scale the 0-2 average onto a 5-bar indicator for a richer visual
     final litBars = ((avg / 2) * 5).round().clamp(0, 5);
@@ -552,7 +562,7 @@ class _CrowdingCard extends StatelessWidget {
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
                 ],
               ),
-              CrowdingBadge(reports: reports),
+              CrowdingBadge(restaurantId: restaurantId),
             ],
           ),
           const SizedBox(height: 10),
@@ -571,7 +581,7 @@ class _CrowdingCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '${avg.toStringAsFixed(1)} / 2 · ${reports.length} report${reports.length != 1 ? 's' : ''}',
+                '${reports.length} report${reports.length != 1 ? 's' : ''} · $_updatedAgo',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
               ),
             ],

@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import '../widgets/rating_text.dart';
 import 'detail_screen.dart';
 import '../services/search_analytics.dart'; // logs searches with no results to the backend
 
@@ -410,7 +411,7 @@ class _SearchResultRow extends StatelessWidget {
                     children: [
                       Icon(Icons.star, size: 10, color: AppColors.accent),
                       const SizedBox(width: 2),
-                      Text('${r.rating}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      RatingText(r.id, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 4),
                       Text('·', style: TextStyle(color: AppColors.closed)),
                       const SizedBox(width: 4),
@@ -427,8 +428,7 @@ class _SearchResultRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const CrowdingBadge(reports: [], small: true),
-                      // No actual reports yet, so nothing is displayed
+                      CrowdingBadge(restaurantId: r.id, small: true), // hidden by itself when there are no recent reports
                     ],
                   ),
                 ],

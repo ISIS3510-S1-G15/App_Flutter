@@ -6,6 +6,8 @@ import 'screens/map_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/profile_screen.dart';
 import 'services/saved_service.dart';
+import 'services/review_service.dart';
+import 'services/occupancy_service.dart';
 import 'services/profile_service.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -31,6 +33,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return; // Tapping the tab that is already open changes nothing
+    OccupancyService.loadAll(); // crowding changes minute by minute: one cheap request refreshes every badge
     setState(() {
       _previousIndex = _selectedIndex;
       _selectedIndex = index;
@@ -42,6 +45,8 @@ class _MainNavigationState extends State<MainNavigation> {
     super.initState();
     SavedService.load(); // the user's saved restaurants, from the backend
     ProfileService.load(); // the user's survey answers, from the backend
+    ReviewService.loadSummaries(); // rating and number of reviews of every restaurant
+    OccupancyService.loadAll(); // crowding level of every restaurant (badges)
   }
 
   @override

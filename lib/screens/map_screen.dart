@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import '../widgets/rating_text.dart';
 import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import '../services/location_service.dart';
@@ -459,11 +460,11 @@ class _SelectedCard extends StatelessWidget {
                     children: [
                       Icon(Icons.star, size: 10, color: AppColors.accent),
                       const SizedBox(width: 2),
-                      Text('${r.rating}', style: AppTextStyles.cardTitle.copyWith(fontSize: 11)),
+                      RatingText(r.id, style: AppTextStyles.cardTitle.copyWith(fontSize: 11)),
                       const SizedBox(width: 8),
                       Text('• ${r.waitTime}', style: TextStyle(fontSize: 11, color: AppColors.closed)),
                       const SizedBox(width: 8),
-                      CrowdingBadge(reports: r.crowdingReports, small: true),
+                      CrowdingBadge(restaurantId: r.id, small: true),
                     ],
                   ),
                 ],

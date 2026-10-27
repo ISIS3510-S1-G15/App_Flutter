@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../models/review.dart';
-import '../data/reviews_data.dart';
+import '../services/review_service.dart';
 import '../utils/text_utils.dart';
 import '../widgets/back_header.dart';
 import '../widgets/app_chip.dart';
@@ -18,33 +18,98 @@ const _categories = [
   (key: 'options', label: 'Diet Options'),
 ];
 
-class ReviewsListScreen extends StatelessWidget {
-  // StatelessWidget because it only displays the reviews; it redraws by listening to allReviews (see build)
+class ReviewsListScreen extends StatefulWidget {
+  // StatefulWidget because the reviews now arrive from the backend after the screen opens (loading -> data/error)
   final Restaurant restaurant;
 
   const ReviewsListScreen({super.key, required this.restaurant});
 
-  void _onWriteReview(BuildContext context) {
-    // Opens the form. When a review is submitted, allReviews changes and this list redraws with it
-    Navigator.of(context).push(
+  @override
+  State<ReviewsListScreen> createState() => _ReviewsListScreenState();
+}
+
+class _ReviewsListScreenState extends State<ReviewsListScreen> {
+  RestaurantReviews? _data; // null until the first answer (or when there is no internet and nothing cached)
+  bool _loading = true;
+
+  Restaurant get restaurant => widget.restaurant;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    // initState already starts with _loading = true (setState is not allowed inside initState)
+    if (!_loading) setState(() => _loading = true);
+    final data = await ReviewService.fetch(restaurant.id); // backend, or the cached copy if offline
+    if (!mounted) return; // the user closed the screen before the answer arrived
+    setState(() {
+      _data = data ?? _data;
+      _loading = false;
+    });
+  }
+
+  Future<void> _onWriteReview(BuildContext context) async {
+    // Opens the form and reloads when the user comes back, so the new review appears in the list
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => WriteReviewScreen(restaurant: restaurant)),
     );
+    if (mounted) _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Listens to all the reviews: every time one is added, the builder runs again
-    return ValueListenableBuilder<List<Review>>(
-      valueListenable: allReviews,
-      builder: (context, _, __) => _buildContent(context, reviewsFor(restaurant.id)),
+    final data = _data;
+    if (data == null) return _buildNoData(context);
+    return _buildContent(context, data);
+  }
+
+  // First load still running, or it failed with no internet and nothing cached
+  Widget _buildNoData(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            BackHeader(eyebrow: 'Reviews', title: restaurant.name, onBack: () => Navigator.of(context).pop()),
+            Expanded(
+              child: Center(
+                child: _loading
+                    ? const CircularProgressIndicator(color: AppColors.accent)
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.wifi_off_rounded, size: 40, color: AppColors.muted),
+                            const SizedBox(height: 12),
+                            Text("Couldn't load the reviews", style: AppTextStyles.cardTitle.copyWith(fontSize: 15)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Check your connection and try again.',
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.muted),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(onPressed: _load, child: const Text('Retry')),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildContent(BuildContext context, List<Review> reviews) {
-    // Overall average = average of the overall rating of each review (0 if there are no reviews)
-    final overall = reviews.isEmpty
-        ? 0.0
-        : reviews.map((r) => r.ratings.overall).reduce((a, b) => a + b) / reviews.length;
+  Widget _buildContent(BuildContext context, RestaurantReviews data) {
+    final reviews = data.reviews;
+    // The big number and the count come from the backend (it uses ALL the reviews, the list may be only the newest 50)
+    final overall = data.summary.rating ?? 0.0;
+    final reviewCount = data.summary.count;
 
     // Counts how many reviews mention each dietary option, and keeps the 5 most mentioned
     final dietCounts = <String, int>{};
@@ -82,6 +147,34 @@ class ReviewsListScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                 children: [
+                  // Without internet the last downloaded reviews are shown, and the user is told so
+                  if (data.fromCache)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.wifi_off_rounded, size: 16, color: AppColors.accent),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "You're offline. Showing the reviews from your last visit.",
+                              style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.dark),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _load,
+                            child: const Text('Retry',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // Summary card: big overall number + category bars + most noted dietary options
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -95,14 +188,14 @@ class ReviewsListScreen extends StatelessWidget {
                             Column(
                               children: [
                                 Text(
-                                  reviews.isEmpty ? '—' : overall.toStringAsFixed(1),
+                                  reviewCount == 0 ? '—' : overall.toStringAsFixed(1),
                                   style: AppTextStyles.headline.copyWith(fontSize: 42, color: Colors.white, height: 1),
                                 ),
                                 const SizedBox(height: 4),
                                 StarsDisplay(value: overall, size: 14),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${reviews.length} review${reviews.length != 1 ? 's' : ''}',
+                                  '$reviewCount review${reviewCount != 1 ? 's' : ''}',
                                   style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
                                 ),
                               ],

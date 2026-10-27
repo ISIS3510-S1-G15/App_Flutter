@@ -1,70 +1,48 @@
-// Widget que muestra si un lugar está lleno o vacío según reportes recientes
+// Widget que muestra si un lugar está lleno o vacío según los reportes recientes (backend)
 import 'package:flutter/material.dart';
+import '../services/occupancy_service.dart';
 import '../theme/app_theme.dart';
 
+// ONE rule to turn the 0-2 average into a label and a color. Before, these thresholds were copied in this
+// badge and in the Detail card; if someone changed one, the two could disagree for the same place
+({String label, Color color}) crowdingStyle(double avg) {
+  if (avg < 0.7) return (label: 'Not crowded', color: AppColors.open);
+  if (avg < 1.4) return (label: 'Moderate', color: AppColors.accent);
+  return (label: 'Busy', color: AppColors.closed);
+}
+
 class CrowdingBadge extends StatelessWidget {
-// "StatelessWidget" means that it does not change on its own once it has been rendered receives data from outside and displays it; it does not manage its own internal state
+  // Receives only the restaurant id: the badge itself reads the current status from OccupancyService,
+  // so every screen (Home, Map, Search, Saved, Detail) shows exactly the same level
+  final String restaurantId;
 
-  final List<int> reports;
-  // List of numbers representing recent occupancy reports
-
-  final bool small;
   // Specifies whether the badge should be displayed in small (true) or normal (false) size
+  final bool small;
 
-  const CrowdingBadge({super.key, required this.reports, this.small = false});
-  // Widget constructor: requires to pass “reports” when creating it, and 'small' is optional (it defaults to “false”)
+  const CrowdingBadge({super.key, required this.restaurantId, this.small = false});
 
   @override
   Widget build(BuildContext context) {
-    // 'build()' is the method that renders the widget on the screen
-    // Flutter calls it automatically when it needs to display this widget
+    // ValueListenableBuilder redraws ONLY this badge when the occupancy data changes (data binding, as in MVVM)
+    return ValueListenableBuilder<Map<String, OccupancyStatus>>(
+      valueListenable: OccupancyService.statuses,
+      builder: (context, _, __) {
+        final status = OccupancyService.statusOf(restaurantId);
+        if (!status.hasData) return const SizedBox.shrink(); // No recent reports: nothing is displayed
 
-    if (reports.isEmpty) return const SizedBox.shrink();
-    // If there are no occupancy reports, nothing is displayed
-    // (SizedBox.shrink() is a zero-sized invisible box)
-
-    final avg = reports.reduce((a, b) => a + b) / reports.length;
-    // Calculate the average of all the numbers in "reports"
-
-    late String label;
-    // Declares a text variable that will be populated later
-
-    late Color color;
-    // Declares a color variable that will be populated later
-
-    if (avg < 0.7) {
-      label = 'Not crowded';
-      color = AppColors.open;
-    } else if (avg < 1.4) {
-      label = 'Moderate';
-      color = AppColors.accent;
-    } else {
-      label = 'Busy';
-      color = AppColors.closed;
-    }
-
-    return Container(
-      // Draws a visual box/container on the screen
-      padding: EdgeInsets.symmetric(horizontal: small ? 6 : 8, vertical: 2),
-      // Internal spacing of the box: if “small” is true, use 6px on the sides. If it is false, use 8px. Always use 2px at the top and bottom
-      decoration: BoxDecoration(
-        // Defines how the box looks (background color, rounded corners, etc.)
-        color: color.withOpacity(0.12),
-        // 12% opacity so it looks like a soft background, not a strong solid color
-        borderRadius: BorderRadius.circular(999),
-        // Rounded corners 
-      ),
-      child: Text(
-        // Display some text inside the box
-        label,
-        // Already defined (Not crowded / Moderate / Busy)
-        style: TextStyle(
-          // Estilo del texto:
-          fontSize: small ? 10 : 11,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
+        final style = crowdingStyle(status.level!);
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: small ? 6 : 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: style.color.withOpacity(0.12), // soft background, not a strong solid color
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            style.label,
+            style: TextStyle(fontSize: small ? 10 : 11, fontWeight: FontWeight.w700, color: style.color),
+          ),
+        );
+      },
     );
   }
 }

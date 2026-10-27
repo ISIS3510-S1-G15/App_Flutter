@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../models/review.dart';
-import '../data/reviews_data.dart';
-import '../data/profile_data.dart';
+import '../services/review_service.dart';
 import '../widgets/back_header.dart';
 import '../widgets/multi_select.dart';
 import '../widgets/app_text_field.dart';
@@ -41,7 +40,8 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   ReviewRatings _ratings = const ReviewRatings(); // All categories start at 0 (not rated)
   List<String> _dietary = [];                     // Dietary options the user selected
   final _commentController = TextEditingController();
-  bool _submitted = false;                         // true after "Submit Review" (shows the "¡Gracias!" screen)
+  bool _submitted = false;                         // true after the backend saved the review (shows "¡Gracias!")
+  bool _sending = false;                           // true while waiting for the backend (avoids double submits)
 
   @override
   void dispose() {
@@ -57,23 +57,30 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     setState(() => _dietary = _dietary.contains(d) ? _dietary.where((x) => x != d).toList() : [..._dietary, d]);
   }
 
-  void _submit() {
-    if (!_allRated) return;
+  Future<void> _submit() async {
+    if (!_allRated || _sending) return;
     FocusScope.of(context).unfocus(); // Closes the keyboard if the comment field was open
+    setState(() => _sending = true);
 
-    final authorName = userProfile.value.name; // Name the user wrote in the survey
-    addReview(Review(
-      id: DateTime.now().millisecondsSinceEpoch.toString(), // Unique enough id for local reviews
-      restaurantId: widget.restaurant.id,
-      author: authorName.isNotEmpty ? authorName : 'Anonymous',
-      date: DateTime.now(),
-      ratings: _ratings,
-      dietaryOptions: _dietary,
-      comment: _commentController.text.trim(),
-    ));
-    // addReview updates allReviews, so the reviews list redraws with this new review
-
-    setState(() => _submitted = true);
+    try {
+      // The author is not sent: the backend takes it from the session token (no more "Anonymous" or fake names)
+      await ReviewService.submit(
+        restaurantId: widget.restaurant.id,
+        ratings: _ratings,
+        dietaryOptions: _dietary,
+        comment: _commentController.text.trim(),
+      );
+      if (!mounted) return; // the user left the screen while the request was running
+      setState(() => _submitted = true);
+    } catch (e) {
+      // Network only (slides 15): a review must reach the server to count. If it fails, the form stays open
+      // WITH the user's answers (unlike case study 2, where the operator lost the whole form)
+      if (!mounted) return;
+      setState(() => _sending = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not send your review. Check your connection and try again.')),
+      );
+    }
   }
 
   @override
@@ -205,7 +212,10 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                         style: TextStyle(fontSize: 11, color: AppColors.mutedLight),
                       ),
                     ),
-                  AppPrimaryButton(label: 'Submit Review', onTap: _allRated ? _submit : null),
+                  AppPrimaryButton(
+                    label: _sending ? 'Sending...' : 'Submit Review',
+                    onTap: _allRated && !_sending ? _submit : null, // disabled while sending: no duplicates
+                  ),
                 ],
               ),
             ),
