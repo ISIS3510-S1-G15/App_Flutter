@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'reviews_list_screen.dart';
 import 'write_review_screen.dart';
 import '../services/saved_service.dart';
+import '../services/restaurant_view_analytics.dart';
 
 class DetailScreen extends StatefulWidget {
   final Restaurant restaurant;
@@ -29,6 +30,7 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   void initState() {
     super.initState();
+    RestaurantViewAnalytics.logView(widget.restaurant.id); // BQ Type 3: every time the detail is opened
     _loadReports();
     SavedService.savedIds.addListener(_onSavedChanged);
   }
