@@ -12,7 +12,6 @@ class OccupancySurvey extends StatelessWidget {
     required this.restaurantName,
   });
 
-  // Call this from anywhere to pop up the survey
   // Call this from anywhere to open the survey as a popup dialog.
   // Returns a Future that completes when the dialog closes, so callers
   // can "await" it and run code right after (e.g. refresh the data shown).
@@ -27,11 +26,18 @@ class OccupancySurvey extends StatelessWidget {
   }
 
   Future<void> _submit(BuildContext context, int level, String label) async {
-    await OccupancyService.submitReport(restaurantId, level);
+    // The report goes to the backend so ALL users see it. It is not queued offline on purpose:
+    // a "Busy" sent 40 minutes later would describe a moment that already passed
+    final sent = await OccupancyService.submitReport(restaurantId, level);
     if (context.mounted) {
+      final messenger = ScaffoldMessenger.of(context); // taken before pop: the dialog's context goes away
       Navigator.of(context).pop(); // close the dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Thanks! Marked as "$label"')),
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(sent
+              ? 'Thanks! Marked as "$label"'
+              : 'Could not send your report. Check your connection and try again.'),
+        ),
       );
     }
   }

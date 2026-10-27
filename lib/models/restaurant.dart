@@ -25,9 +25,6 @@ class Restaurant {
   final double latitude;
   final double longitude;
 
-  // Recent crowding reports (same 0-2 scale used by CrowdingBadge: 0 = not crowded, 2 = busy)
-  final List<int> crowdingReports;
-
   const Restaurant({
     required this.id,
     required this.name,
@@ -48,7 +45,6 @@ class Restaurant {
     this.mapY = 50,
     this.latitude = 4.6018,
     this.longitude = -74.0661,
-    this.crowdingReports = const [],
   });
 
   bool get isOpenNow => isOpenAt(this, DateTime.now());
