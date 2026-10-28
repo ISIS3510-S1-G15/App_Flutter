@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
@@ -6,6 +8,7 @@ import '../widgets/crowding_badge.dart';
 import '../widgets/rating_text.dart';
 import 'detail_screen.dart';
 import '../services/search_analytics.dart'; // logs searches with no results to the backend
+import '../utils/search_filter.dart';
 
 // Fixed lists of sample data (not yet sourced from an actual database)
 const _recentNames = ['Starbucks', 'Kai Sushi', 'Cosechas'];
@@ -30,6 +33,12 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';       // What the user has typed so far
   bool _focused = false;    // Whether the input is currently focused or not
 
+  // ---------- Multithreading: the search runs in a separate isolate ----------
+  List<Restaurant> _results = []; // Restaurants that match the current search (filled by the isolate)
+  bool _searching = false; // True while the isolate is working, so "No results" doesn't flash
+  Timer? _debounce; // Waits until the user stops typing for a moment before searching
+  int _searchId = 0; // Number of the latest search, to ignore answers from older ones
+
   @override
   void initState() {
     // Runs ONLY once, when the screen is first created
@@ -44,36 +53,65 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     // Runs when the screen is destroyed (the user navigates to another screen)
+    _debounce?.cancel();   // stops a pending search
     _controller.dispose(); // frees up the text controller's memory
     _focusNode.dispose();  // frees the memory of the focus node
     super.dispose();
   }
 
-  List<Restaurant> get _results {
-    // Calculates, in real time, which restaurants match what the user typed
-    if (_query.trim().isEmpty) return [];
-    // If nothing has been entered, there are no results to display (another view is displayed instead)
-
-    final q = _query.toLowerCase();
-    // Converts the search to lowercase so that "starbucks" matches "Starbucks"
-    return restaurants.where((r) {
-      // Filters the complete list of restaurants, keeping only those that match by name, category, location, or any of their tags
-      return r.name.toLowerCase().contains(q) ||
-          r.category.toLowerCase().contains(q) ||
-          r.location.toLowerCase().contains(q) ||
-          r.tags.any((t) => t.toLowerCase().contains(q));
-    }).toList();
+  // Runs the search matching in a SEPARATE ISOLATE (another thread with its own memory).
+  // Comparing the text against every restaurant is CPU work, not waiting, so a Future alone would still
+  // run it on the UI thread; Isolate.run moves it off the UI thread so typing never stutters,
+  // even when the catalog grows to hundreds of restaurants
+  static Future<List<Restaurant>> _searchInIsolate(String query) {
+    final all = restaurants; // copied into the new isolate
+    return Isolate.run(() => filterRestaurants(all, query));
   }
 
-  void _onSearchSubmitted(String value) {
+  // Called on every keystroke: waits 250 ms without typing before starting a search (debounce),
+  // so we don't start one isolate per letter
+  void _onQueryChanged(String value) {
+    setState(() => _query = value);
+    _debounce?.cancel();
+    if (value.trim().isEmpty) {
+      _searchId++; // any search still running is now outdated
+      setState(() {
+        _results = [];
+        _searching = false;
+      });
+      return;
+    }
+    setState(() => _searching = true);
+    _debounce = Timer(const Duration(milliseconds: 250), _runSearch);
+  }
+
+  // async/await: waits for the isolate's answer without blocking the screen
+  Future<void> _runSearch() async {
+    final id = ++_searchId;
+    final found = await _searchInIsolate(_query);
+    // If the user kept typing (a newer search started) or left the screen, this answer is thrown away
+    if (!mounted || id != _searchId) return;
+    setState(() {
+      _results = found;
+      _searching = false;
+    });
+  }
+
+  Future<void> _onSearchSubmitted(String value) async {
     // Called only when the user presses Enter / Done on the keyboard,
     // once they've finished typing — not on every keystroke
     final trimmed = value.trim();
     if (trimmed.isEmpty) return;
 
-    if (_results.isEmpty) {
-      SearchAnalytics.logZeroResultSearch(trimmed.toLowerCase());
-    }
+    _debounce?.cancel();
+    await _runSearch(); // the latest results, even if Enter came before the debounce finished
+    if (!mounted || _results.isNotEmpty) return;
+
+    // Future with handlers: the zero-result search is sent in the background and the screen keeps working.
+    // .then runs if the backend saved it, .catchError if it failed (no internet, server down)
+    SearchAnalytics.logZeroResultSearch(trimmed.toLowerCase())
+        .then((_) => debugPrint('Logged zero-result search: $trimmed'))
+        .catchError((Object e) => debugPrint('Could not log zero-result search: $e'));
   }
 
   void _onSelect(Restaurant r) {
@@ -87,9 +125,9 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     // This method redraws the ENTIRE screen. It runs every time something changes (e.g., the user types another character into the search bar)
 
-    final results = _results; // The restaurants that match the current search
-    final showEmpty = _query.trim().isNotEmpty && results.isEmpty;
-    // True if the user entered something but there are no results (to display "no results")
+    final results = _results; // The restaurants that match the current search (computed by the isolate)
+    final showEmpty = _query.trim().isNotEmpty && results.isEmpty && !_searching;
+    // True if the user entered something, the search finished and there are no results (to display "no results")
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -128,7 +166,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: TextField(
                             controller: _controller,
                             focusNode: _focusNode,
-                            onChanged: (v) => setState(() => _query = v),
+                            onChanged: _onQueryChanged,
                             // Every time the text changes, update "_query," and Flutter will automatically recalculate the results shown on screen
                             onSubmitted: _onSearchSubmitted,
                             // Only logs the search to the backend when the user presses Enter/Done
@@ -148,7 +186,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           GestureDetector(
                             onTap: () {
                               _controller.clear();
-                              setState(() => _query = '');
+                              _onQueryChanged('');
                             },
                             child: Container(
                               width: 20,
@@ -279,7 +317,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           onTap: () {
                             // When a tag is tapped, it displays it as if the user had typed it
                             _controller.text = tag;
-                            setState(() => _query = tag);
+                            _onQueryChanged(tag);
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
