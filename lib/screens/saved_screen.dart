@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
+import '../widgets/rating_text.dart';
 import '../services/saved_service.dart';
 import 'detail_screen.dart';
 import '../data/profile_data.dart';
@@ -260,7 +261,7 @@ class SavedScreen extends StatelessWidget {
                                   children: [
                                     Icon(Icons.star, size: 8, color: AppColors.accent),
                                     const SizedBox(width: 2),
-                                    Text('${r.rating}',
+                                    RatingText(r.id,
                                         style: TextStyle(fontSize: 10, color: AppColors.closed)),
                                   ],
                                 ),
@@ -340,7 +341,7 @@ class _SavedCard extends StatelessWidget {
                           children: [
                             Icon(Icons.star, size: 10, color: AppColors.accent),
                             const SizedBox(width: 2),
-                            Text('${r.rating}',
+                            RatingText(r.id,
                                 style: const TextStyle(
                                     color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                           ],
@@ -391,7 +392,7 @@ class _SavedCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const CrowdingBadge(reports: [], small: true),
+                      CrowdingBadge(restaurantId: r.id, small: true),
                     ],
                   ),
                 ],

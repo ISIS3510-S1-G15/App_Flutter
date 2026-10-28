@@ -22,7 +22,6 @@ final List<Restaurant> restaurants = [
     mapY: 25,
     latitude: 4.6016,
     longitude: -74.0658,
-    crowdingReports: [1, 1, 2, 1, 0, 1],
     menu: [
       MenuSection(category: 'Drinks', items: [
         MenuItem(name: 'Oat Latte', price: '\$15.250', desc: 'Double shot, oat milk, light foam'),
@@ -55,7 +54,6 @@ final List<Restaurant> restaurants = [
     mapY: 55,
     latitude: 4.6031,
     longitude: -74.0672,
-    crowdingReports: [0, 1, 0, 0, 1],
     menu: [
       MenuSection(category: 'Ramen', items: [
         MenuItem(name: 'Tonkotsu Ramen', price: '\$20.500', desc: 'Rich pork broth, chashu, soft egg, nori'),
@@ -87,7 +85,6 @@ final List<Restaurant> restaurants = [
     mapY: 35,
     latitude: 4.6012,
     longitude: -74.0679,
-    crowdingReports: [2, 2, 1, 2, 2],
     menu: [
       MenuSection(category: 'Smoothies', items: [
         MenuItem(name: 'Green Machine', price: '\$8.500', desc: 'Spinach, banana, mango, ginger, coconut water'),
@@ -115,7 +112,6 @@ final List<Restaurant> restaurants = [
     mapY: 70,
     latitude: 4.6024,
     longitude: -74.0686,
-    crowdingReports: [0, 0, 1, 0],
     menu: [
       MenuSection(category: 'Burgers', items: [
         MenuItem(name: 'Classic Smash', price: '\$21.500', desc: 'Double smash patty, American cheese, pickles, special sauce'),

@@ -7,6 +7,7 @@ import '../models/restaurant.dart';
 import '../utils/text_utils.dart';
 import '../utils/meal_context.dart';
 import '../widgets/crowding_badge.dart';
+import '../widgets/rating_text.dart';
 import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import 'detail_screen.dart';
@@ -319,7 +320,7 @@ class _FeaturedCard extends StatelessWidget {
                       children: [
                         const Icon(Icons.star, size: 12, color: AppColors.accent),
                         const SizedBox(width: 4),
-                        Text('${r.rating}',
+                        RatingText(r.id,
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
                         const SizedBox(width: 12),
                         Text(r.location, style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
@@ -472,11 +473,11 @@ class _RestaurantCard extends StatelessWidget {
                             children: [
                               const Icon(Icons.star, size: 11, color: AppColors.accent),
                               const SizedBox(width: 2),
-                              Text('${r.rating}',
+                              RatingText(r.id,
                                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.dark)),
                             ],
                           ),
-                          Text('(${r.reviews})', style: const TextStyle(fontSize: 11, color: AppColors.mutedLight)),
+                          RatingText.count(r.id, style: const TextStyle(fontSize: 11, color: AppColors.mutedLight)),
                           const Text('·', style: TextStyle(fontSize: 11, color: AppColors.mutedLight)),
                           Text(r.price,
                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.muted)),
@@ -507,7 +508,7 @@ class _RestaurantCard extends StatelessWidget {
                                 ),
                                 child: Text(tag, style: const TextStyle(fontSize: 10, color: AppColors.muted)),
                               )),
-                          CrowdingBadge(reports: r.crowdingReports, small: true),
+                          CrowdingBadge(restaurantId: r.id, small: true),
                         ],
                       ),
                     ],
