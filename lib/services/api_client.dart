@@ -16,7 +16,7 @@ class ApiClient {
   factory ApiClient() => _instance;
 
   // 10.0.2.2 is how the Android emulator reaches the computer running the backend (localhost)
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:8000');
 
   // If the backend does not answer in this time, the request fails instead of freezing the feature
   static const Duration timeout = Duration(seconds: 5);
