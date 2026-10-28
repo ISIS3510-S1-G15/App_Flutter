@@ -33,7 +33,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return; // Tapping the tab that is already open changes nothing
-    OccupancyService.loadAll(); // crowding changes minute by minute: one cheap request refreshes every badge
+    OccupancyService.loadAll(source: OccupancyRefreshSource.tabChange); // crowding changes minute by minute: one cheap request refreshes every badge
     setState(() {
       _previousIndex = _selectedIndex;
       _selectedIndex = index;
@@ -46,7 +46,7 @@ class _MainNavigationState extends State<MainNavigation> {
     SavedService.load(); // the user's saved restaurants, from the backend
     ProfileService.load(); // the user's survey answers, from the backend
     ReviewService.loadSummaries(); // rating and number of reviews of every restaurant
-    OccupancyService.loadAll(); // crowding level of every restaurant (badges)
+    OccupancyService.loadAll(source: OccupancyRefreshSource.appOpen); // crowding level of every restaurant (badges)
   }
 
   @override

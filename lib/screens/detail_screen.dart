@@ -37,8 +37,8 @@ class _DetailScreenState extends State<DetailScreen> {
   void initState() {
     super.initState();
     RestaurantViewAnalytics.logView(widget.restaurant.id); // BQ Type 3: every time the detail is opened
-    _refreshOccupancy();
-    _pollTimer = Timer.periodic(_pollEvery, (_) => _refreshOccupancy());
+    _refreshOccupancy(OccupancyRefreshSource.detailOpen);
+    _pollTimer = Timer.periodic(_pollEvery, (_) => _refreshOccupancy(OccupancyRefreshSource.detailPoll));
     // The screen redraws when any of the data it shows changes (bookmark, crowding, rating)
     SavedService.savedIds.addListener(_onDataChanged);
     OccupancyService.statuses.addListener(_onDataChanged);
@@ -66,9 +66,9 @@ class _DetailScreenState extends State<DetailScreen> {
     }
   }
 
-  Future<void> _refreshOccupancy() async {
+  Future<void> _refreshOccupancy(OccupancyRefreshSource source) async {
     // Updates OccupancyService.statuses; the listener above redraws the card (and the badges of other screens)
-    final status = await OccupancyService.refresh(widget.restaurant.id);
+    final status = await OccupancyService.refresh(widget.restaurant.id, source: source);
     // The indicator is now on screen: counts as checking the occupancy (once per visit)
     if (mounted && !_checkLogged) {
       _checkLogged = true;
