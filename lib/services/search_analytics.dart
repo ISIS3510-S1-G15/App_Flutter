@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'api_client.dart';
 
 class SearchAnalytics {
   // Usa 10.0.2.2 para el emulador de Android
-  static const String _baseUrl = 'http://10.0.2.2:8000';
+  static const String _baseUrl = ApiClient.baseUrl;
 
   // Guarda un término que no arrojó resultados.
   // async/await: espera la respuesta del backend sin bloquear la pantalla.

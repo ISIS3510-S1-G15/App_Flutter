@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'api_client.dart';
 
 // Type 2 BQ: "What percentage of users complete the food preferences survey
 // during onboarding?"
 class OnboardingAnalytics {
   // Usa 10.0.2.2 para el emulador de Android
-  static const String _baseUrl = 'http://10.0.2.2:8000';
+  static const String _baseUrl = ApiClient.baseUrl;
 
   // Identifica un mismo recorrido de la encuesta, para saber si quien la empezó también la terminó
   static String newSessionId() =>
