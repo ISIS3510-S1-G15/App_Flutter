@@ -6,6 +6,7 @@ import '../widgets/progress_bar.dart';
 import '../utils/text_utils.dart';
 import '../widgets/app_chip.dart';
 import '../widgets/circle_button.dart';
+import '../widgets/survey_completion_banner.dart';
 import 'survey_screen.dart';
 import 'auth_gate.dart';
 import '../services/auth_service.dart';
@@ -308,6 +309,11 @@ class ProfileScreen extends StatelessWidget {
                   child: Text(profile.dislikedFoods, style: AppTextStyles.body.copyWith(fontSize: 13)),
                 ),
               ),
+
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: SurveyCompletionBanner(callToAction: 'Keep yours up to date to get better recommendations.'),
+            ),
 
             // Actions: retake the survey
             Padding(

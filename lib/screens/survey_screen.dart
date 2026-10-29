@@ -7,6 +7,7 @@ import '../widgets/multi_select.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/success_check.dart';
+import '../widgets/survey_completion_banner.dart';
 import '../services/onboarding_analytics.dart';
 import '../services/profile_service.dart';
 
@@ -199,6 +200,8 @@ class _SurveyScreenState extends State<SurveyScreen> {
             'Tell us a bit about yourself so we can personalize your experience.',
             style: AppTextStyles.body.copyWith(fontSize: 13, color: AppColors.muted),
           ),
+          const SizedBox(height: 12),
+          const SurveyCompletionBanner(callToAction: 'Finish yours to get better recommendations.'),
           const SizedBox(height: 16),
         ] else ...[
           Text('FOOD PREFERENCES', style: _eyebrowStyle),
