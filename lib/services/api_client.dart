@@ -15,8 +15,7 @@ class ApiClient {
   // 3. Factory constructor: ApiClient() does NOT create a new object, it returns the same _instance
   factory ApiClient() => _instance;
 
-  // 10.0.2.2 is how the Android emulator reaches the computer running the backend (localhost)
-  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:8001');
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://backend-production-925d.up.railway.app');
 
   // If the backend does not answer in this time, the request fails instead of freezing the feature
   static const Duration timeout = Duration(seconds: 5);

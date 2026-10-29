@@ -1,5 +1,15 @@
 # app_flutter
 
+La app consume la API desplegada en Railway (siempre activa): `https://backend-production-925d.up.railway.app`. No hace falta correr el Backend en tu computador.
+
+Para apuntar a otro servidor (por ejemplo, un Backend local):
+
+```
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8001
+```
+
+Usuario de prueba: `demo01@uniandes.edu.co` / `Demo1234!`.
+
 A new Flutter project.
 
 ## Getting Started
