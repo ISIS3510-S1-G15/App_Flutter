@@ -34,10 +34,20 @@ class OnboardingAnalytics {
 
   // Lee el resumen: sesiones iniciadas, completadas, porcentaje y hasta qué paso llegaron
   static Future<Map<String, dynamic>?> getCompletion() async {
-    final response = await http.get(Uri.parse('$_baseUrl/analytics/onboarding-completion'));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
+    try {
+      final response = await http
+          .get(Uri.parse('$_baseUrl/analytics/onboarding-completion'))
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
     return null;
+  }
+
+  static Future<double?> completionRate() async {
+    final summary = await getCompletion();
+    if (summary == null || (summary['started'] as num? ?? 0) == 0) return null;
+    return (summary['completion_rate'] as num).toDouble();
   }
 }
