@@ -51,4 +51,16 @@ void main() {
     final ranked = PreferenceMatcher.rank([starbucks, yamato, laPuerta, cosechas], profile, distance);
     expect(ranked.first.name, 'La Puerta');
   });
+
+  test('background isolate gives the same scores as the main thread', () async {
+    const profile = SurveyAnswers(cuisines: ['Asian'], dietaryRestrictions: ['Vegetarian'], budget: '\$8.000 – \$15.000');
+    final distances = {for (final r in restaurants) r.id: 150.0};
+    final background = await PreferenceMatcher.scoreAllInBackground(restaurants, profile, distances);
+    final main = PreferenceMatcher.scoreAll(restaurants, profile, distances);
+    expect(background.keys, main.keys);
+    for (final id in main.keys) {
+      expect(background[id]!.percent, main[id]!.percent);
+      expect(background[id]!.reasons, main[id]!.reasons);
+    }
+  });
 }
