@@ -58,6 +58,7 @@ class _MainNavigationState extends State<MainNavigation> {
         Future.delayed(const Duration(seconds: 3), () {
           PendingEvents.sendAll();
           SavedService.load();
+          ProfileService.syncPending();
         });
       }
     });
