@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import '../models/restaurant.dart';
 import '../models/survey_answers.dart';
 
@@ -101,6 +102,20 @@ class PreferenceMatcher {
 
     return PreferenceMatch(percent: (result * 100).round(), reasons: reasons, warnings: warnings);
   }
+
+  static Map<String, PreferenceMatch> scoreAll(
+    List<Restaurant> list,
+    SurveyAnswers p,
+    Map<String, double?> distances,
+  ) =>
+      {for (final r in list) r.id: score(r, p, distanceMeters: distances[r.id])};
+
+  static Future<Map<String, PreferenceMatch>> scoreAllInBackground(
+    List<Restaurant> list,
+    SurveyAnswers p,
+    Map<String, double?> distances,
+  ) =>
+      Isolate.run(() => scoreAll(list, p, distances));
 
   static List<Restaurant> rank(List<Restaurant> list, SurveyAnswers p, double? Function(Restaurant) distance) {
     final scores = {for (final r in list) r.id: score(r, p, distanceMeters: distance(r)).percent};
