@@ -12,17 +12,26 @@ class SurveyCompletionBanner extends StatefulWidget {
 }
 
 class _SurveyCompletionBannerState extends State<SurveyCompletionBanner> {
-  late final Future<double?> _rate = OnboardingAnalytics.completionRate();
+  late final Future<CompletionRate?> _rate = OnboardingAnalytics.completionRate();
+
+  String _age(DateTime at) {
+    final diff = DateTime.now().difference(at);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes} min ago';
+    if (diff.inDays < 1) return '${diff.inHours} h ago';
+    return '${diff.inDays} d ago';
+  }
 
   String _format(double rate) => rate == rate.roundToDouble() ? rate.toStringAsFixed(0) : rate.toStringAsFixed(1);
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<double?>(
+    return FutureBuilder<CompletionRate?>(
       future: _rate,
       builder: (context, snapshot) {
-        final rate = snapshot.data;
-        if (rate == null) return const SizedBox.shrink();
+        final data = snapshot.data;
+        if (data == null) return const SizedBox.shrink();
+        final rate = data.rate;
 
         return Container(
           width: double.infinity,
@@ -46,6 +55,11 @@ class _SurveyCompletionBannerState extends State<SurveyCompletionBanner> {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       TextSpan(text: ' complete this survey. ${widget.callToAction}'),
+                      if (data.fromCache)
+                        TextSpan(
+                          text: '\nOffline · last updated ${_age(data.updatedAt)}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                        ),
                     ],
                   ),
                 ),
