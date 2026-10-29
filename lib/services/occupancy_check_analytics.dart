@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'api_client.dart';
+import 'pending_events.dart';
 
 // BQ: "How often do users check or inquire about a restaurant's occupancy level before deciding to go?"
 //   1. Capture:    DetailScreen sends "occupancy_checked" when it shows the crowding indicator
@@ -22,7 +23,8 @@ class OccupancyCheckAnalytics {
     try {
       await _api.postJson('/analytics/occupancy-event', body);
     } catch (e) {
-      debugPrint('Could not log occupancy event: $e');
+      debugPrint('Could not log occupancy event, saved to send later: $e');
+      await PendingEvents.add('/analytics/occupancy-event', body);
     }
   }
 }

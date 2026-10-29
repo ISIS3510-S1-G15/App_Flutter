@@ -9,6 +9,7 @@ import '../widgets/rating_text.dart';
 import 'detail_screen.dart';
 import '../services/search_analytics.dart'; // logs searches with no results to the backend
 import '../utils/search_filter.dart';
+import '../services/pending_events.dart';
 
 // Fixed lists of sample data (not yet sourced from an actual database)
 const _recentNames = ['Starbucks', 'Kai Sushi', 'Cosechas'];
@@ -111,7 +112,10 @@ class _SearchScreenState extends State<SearchScreen> {
     // .then runs if the backend saved it, .catchError if it failed (no internet, server down)
     SearchAnalytics.logZeroResultSearch(trimmed.toLowerCase())
         .then((_) => debugPrint('Logged zero-result search: $trimmed'))
-        .catchError((Object e) => debugPrint('Could not log zero-result search: $e'));
+        .catchError((Object e) {
+          debugPrint('Could not log zero-result search, saved to send later: $e');
+          PendingEvents.add('/analytics/zero-result-search', {'query': trimmed.toLowerCase()});
+        });
   }
 
   void _onSelect(Restaurant r) {

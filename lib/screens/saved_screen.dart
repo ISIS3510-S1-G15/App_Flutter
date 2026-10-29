@@ -52,6 +52,15 @@ class SavedScreen extends StatelessWidget {
                     Text('Saved', style: AppTextStyles.headline.copyWith(fontSize: 24)),
                     Text('${saved.length} spots saved',
                         style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.closed)),
+                    ValueListenableBuilder<DateTime?>(
+                      valueListenable: SavedService.lastSyncedAt,
+                      builder: (context, syncedAt, _) => syncedAt == null
+                          ? const SizedBox.shrink()
+                          : Text(
+                              'Synced at ${syncedAt.hour.toString().padLeft(2, '0')}:${syncedAt.minute.toString().padLeft(2, '0')}',
+                              style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.closed),
+                            ),
+                    ),
                   ],
                 ),
               ],

@@ -4,6 +4,7 @@ import '../main_navigation.dart';
 import '../data/profile_data.dart';
 import '../models/survey_answers.dart';
 import '../services/auth_service.dart';
+import '../services/saved_service.dart';
 import '../widgets/app_open_tracker.dart';
 import 'login_screen.dart';
 import 'survey_screen.dart';
@@ -36,6 +37,7 @@ class AuthGate extends StatefulWidget {
   static Future<void> logout(BuildContext context) async {
     final navigator = Navigator.of(context, rootNavigator: true);
     await AuthService.logout();
+    await SavedService.clear();
     userProfile.value = const SurveyAnswers(); // the next person must not see this user's preferences
     navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
   }
