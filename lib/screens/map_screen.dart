@@ -8,6 +8,7 @@ import '../widgets/rating_text.dart';
 import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import '../services/location_service.dart';
+import '../services/map_tile_cache.dart';
 import '../services/meal_context.dart';
 import '../services/preference_match.dart';
 import '../data/profile_data.dart';
@@ -39,6 +40,7 @@ class _MapScreenState extends State<MapScreen> {
 
   // Controls the real map's camera (center + zoom)
   final _mapController = MapController();
+  final _tileProvider = MapTileCache.tileProvider();
   bool _mapReady = false;
 
   // Selects a spot (or clears the selection) and moves the map camera to it
@@ -260,6 +262,7 @@ class _MapScreenState extends State<MapScreen> {
                           TileLayer(
                             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.example.app_flutter',
+                            tileProvider: _tileProvider,
                           ),
                           MarkerLayer(
                             markers: [
