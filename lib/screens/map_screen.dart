@@ -9,6 +9,8 @@ import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import '../services/location_service.dart';
 import '../services/meal_context.dart';
+import '../services/preference_match.dart';
+import '../data/profile_data.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -116,6 +118,14 @@ class _MapScreenState extends State<MapScreen> {
     return '${LocationService.formatDistance(d)} · ${LocationService.walkingMinutes(d)} min walk';
   }
 
+  String? _matchLabel(Restaurant r) {
+    final profile = userProfile.value;
+    if (!PreferenceMatcher.hasPreferences(profile)) return null;
+    final match = PreferenceMatcher.score(r, profile, distanceMeters: _distanceTo(r));
+    final warning = match.warnings.isEmpty ? '' : ' · ${match.warnings.first}';
+    return '${match.percent}% match for you$warning';
+  }
+
   // Message above the list that adapts to the user's context: locating, no permission, off campus, or the closest open spot
   Widget _buildLocationBanner() {
     if (_locating) {
@@ -145,7 +155,23 @@ class _MapScreenState extends State<MapScreen> {
     // Combines location + time of day + open status: the closest open spot that fits the current meal
     final meal = MealMoment.at(_now);
     final fitting = meal == null ? <Restaurant>[] : open.where((r) => meal.fits(r.category)).toList();
-    final pick = fitting.isNotEmpty ? fitting.first : open.first;
+    final candidates = fitting.isNotEmpty ? fitting : open;
+    final profile = userProfile.value;
+
+    if (PreferenceMatcher.hasPreferences(profile)) {
+      final best = PreferenceMatcher.rank(candidates, profile, _distanceTo).first;
+      final match = PreferenceMatcher.score(best, profile, distanceMeters: _distanceTo(best));
+      final why = match.summary.isEmpty ? '' : ' (${match.summary})';
+      final prefix = fitting.isNotEmpty ? '${meal!.label} time · ' : '';
+      return _LocationBanner(
+        icon: Icons.auto_awesome,
+        text: '${prefix}Best match for you: ${best.name} · ${match.percent}% match$why · ${_distanceLabel(best)}',
+        actionLabel: 'Show',
+        onAction: () => _selectSpot(best),
+      );
+    }
+
+    final pick = candidates.first;
     final text = fitting.isNotEmpty
         ? '${meal!.label} time · Closest for ${meal.label.toLowerCase()}: ${pick.name} · ${_distanceLabel(pick)}'
         : 'Closest open spot: ${pick.name} · ${_distanceLabel(pick)}';
@@ -353,6 +379,7 @@ class _MapScreenState extends State<MapScreen> {
                           restaurant: r,
                           selected: _selected?.id == r.id,
                           distanceLabel: _distanceLabel(r),
+                          matchLabel: _matchLabel(r),
                           onTap: () => _selectSpot(r),
                         ),
                       )),
@@ -482,9 +509,16 @@ class _QuickListItem extends StatelessWidget {
   final Restaurant restaurant;
   final bool selected;
   final String? distanceLabel; // Shown only when the user's location is known
+  final String? matchLabel;
   final VoidCallback onTap;
 
-  const _QuickListItem({required this.restaurant, required this.selected, this.distanceLabel, required this.onTap});
+  const _QuickListItem({
+    required this.restaurant,
+    required this.selected,
+    this.distanceLabel,
+    this.matchLabel,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -514,6 +548,11 @@ class _QuickListItem extends StatelessWidget {
                   Text('${r.waitTime} wait', style: TextStyle(fontSize: 11, color: AppColors.closed)),
                   if (distanceLabel != null)
                     Text(distanceLabel!, style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w600)),
+                  if (matchLabel != null)
+                    Text(matchLabel!,
+                        style: const TextStyle(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
