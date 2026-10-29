@@ -29,6 +29,8 @@ class _MapScreenState extends State<MapScreen> {
   String _filter = 'all'; // 'all' | 'open'
   Restaurant? _selected;
   String? _loggedRecommendation;
+  Map<String, PreferenceMatch> _matches = const {};
+  int _matchesRun = 0;
 
   // GPS state: the user's position (null until it is read), why it is unavailable, and if it is still loading
   Position? _position;
@@ -59,6 +61,8 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    userProfile.addListener(_refreshMatches);
+    _refreshMatches();
     _loadLocation();
     _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() => _now = DateTime.now()));
   }
@@ -68,6 +72,7 @@ class _MapScreenState extends State<MapScreen> {
     // Stops the GPS and the clock when the screen is destroyed (saves battery)
     _positionSub?.cancel();
     _clock?.cancel();
+    userProfile.removeListener(_refreshMatches);
     super.dispose();
   }
 
@@ -86,16 +91,32 @@ class _MapScreenState extends State<MapScreen> {
       _locationError = result.error;
     });
     _centerOnUser();
+    _refreshMatches();
 
     if (result.position != null) {
       _positionSub?.cancel();
       _positionSub = LocationService.positionStream().listen(
         (p) {
-          if (mounted) setState(() => _position = p);
+          if (!mounted) return;
+          setState(() => _position = p);
+          _refreshMatches();
         },
         onError: (_) {}, // Keeps the last known position if an update fails
       );
     }
+  }
+
+  Future<void> _refreshMatches() async {
+    final profile = userProfile.value;
+    final run = ++_matchesRun;
+    if (!PreferenceMatcher.hasPreferences(profile)) {
+      if (_matches.isNotEmpty) setState(() => _matches = const {});
+      return;
+    }
+    final distances = {for (final r in restaurants) r.id: _distanceTo(r)};
+    final result = await PreferenceMatcher.scoreAllInBackground(restaurants, profile, distances);
+    if (!mounted || run != _matchesRun) return;
+    setState(() => _matches = result);
   }
 
   double? _distanceTo(Restaurant r) =>
@@ -122,9 +143,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   String? _matchLabel(Restaurant r) {
-    final profile = userProfile.value;
-    if (!PreferenceMatcher.hasPreferences(profile)) return null;
-    final match = PreferenceMatcher.score(r, profile, distanceMeters: _distanceTo(r));
+    final match = _matches[r.id];
+    if (match == null) return null;
     final warning = match.warnings.isEmpty ? '' : ' · ${match.warnings.first}';
     return '${match.percent}% match for you$warning';
   }
@@ -159,9 +179,10 @@ class _MapScreenState extends State<MapScreen> {
     final meal = MealMoment.at(_now);
     final fitting = meal == null ? <Restaurant>[] : open.where((r) => meal.fits(r.category)).toList();
     final candidates = fitting.isNotEmpty ? fitting : open;
-    final profile = userProfile.value;
-    final personalized = PreferenceMatcher.hasPreferences(profile);
-    final ranked = personalized ? PreferenceMatcher.rank(candidates, profile, _distanceTo) : candidates;
+    final personalized = candidates.every((r) => _matches.containsKey(r.id));
+    final ranked = personalized
+        ? ([...candidates]..sort((a, b) => _matches[b.id]!.percent.compareTo(_matches[a.id]!.percent)))
+        : candidates;
 
     final best = ranked.first;
     final bestLevel = OccupancyService.statusOf(best.id).level;
@@ -172,7 +193,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (alternative != null) {
       final match = personalized
-          ? ' · ${PreferenceMatcher.score(alternative, profile, distanceMeters: _distanceTo(alternative)).percent}% match'
+          ? ' · ${_matches[alternative.id]!.percent}% match'
           : '';
       return _LocationBanner(
         icon: Icons.swap_horiz,
@@ -183,7 +204,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (personalized) {
-      final match = PreferenceMatcher.score(best, profile, distanceMeters: _distanceTo(best));
+      final match = _matches[best.id]!;
       final why = match.summary.isEmpty ? '' : ' (${match.summary})';
       return _LocationBanner(
         icon: Icons.auto_awesome,
