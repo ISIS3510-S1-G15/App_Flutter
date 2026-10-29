@@ -1,27 +1,37 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
+import 'local_db.dart';
 
-// Restaurants the logged-in user saved (bookmark on the detail screen), stored in the backend per user.
-// savedIds is a ValueNotifier, so the Saved tab and the detail's bookmark redraw as soon as it changes
 class SavedService {
-  static final ApiClient _api = ApiClient(); // Singleton: already carries the user's session token
+  static final ApiClient _api = ApiClient();
+  static const _lastSyncKey = 'saved_last_synced_at';
 
   static final ValueNotifier<Set<String>> savedIds = ValueNotifier(<String>{});
+  static final ValueNotifier<DateTime?> lastSyncedAt = ValueNotifier(null);
 
   static bool isSaved(String restaurantId) => savedIds.value.contains(restaurantId);
 
-  // Reads the user's saved restaurants. Called when the main app opens (after login or a restored session)
   static Future<void> load() async {
     try {
-      final data = await _api.getJson('/me/saved') as Map<String, dynamic>;
-      savedIds.value = (data['restaurant_ids'] as List).cast<String>().toSet();
+      savedIds.value = await LocalDb.getSavedIds();
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getString(_lastSyncKey);
+      lastSyncedAt.value = stored == null ? null : DateTime.tryParse(stored);
     } catch (e) {
-      debugPrint('Could not load saved restaurants: $e'); // keeps what was there (empty at first)
+      debugPrint('Could not read local saved restaurants: $e');
+    }
+    try {
+      final data = await _api.getJson('/me/saved') as Map<String, dynamic>;
+      final ids = (data['restaurant_ids'] as List).cast<String>().toSet();
+      savedIds.value = ids;
+      await LocalDb.replaceSavedIds(ids);
+      await _markSynced();
+    } catch (e) {
+      debugPrint('Could not load saved restaurants from the backend: $e');
     }
   }
 
-  // Saves or unsaves a restaurant. The icon changes right away and goes back if the server can't be reached.
-  // Returns false when it failed, so the screen can tell the user
   static Future<bool> toggle(String restaurantId) async {
     final wasSaved = isSaved(restaurantId);
     final before = savedIds.value;
@@ -31,6 +41,8 @@ class SavedService {
           ? await _api.deleteJson('/me/saved/$restaurantId')
           : await _api.putJson('/me/saved/$restaurantId');
       savedIds.value = ((data as Map<String, dynamic>)['restaurant_ids'] as List).cast<String>().toSet();
+      wasSaved ? await LocalDb.removeSaved(restaurantId) : await LocalDb.addSaved(restaurantId);
+      await _markSynced();
       return true;
     } catch (e) {
       debugPrint('Could not update saved restaurant: $e');
@@ -39,6 +51,22 @@ class SavedService {
     }
   }
 
-  // Forgets the previous user's list when logging out
-  static void clear() => savedIds.value = <String>{};
+  static Future<void> _markSynced() async {
+    final now = DateTime.now();
+    lastSyncedAt.value = now;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_lastSyncKey, now.toIso8601String());
+  }
+
+  static Future<void> clear() async {
+    savedIds.value = <String>{};
+    lastSyncedAt.value = null;
+    try {
+      await LocalDb.clearSaved();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_lastSyncKey);
+    } catch (e) {
+      debugPrint('Could not clear local saved restaurants: $e');
+    }
+  }
 }

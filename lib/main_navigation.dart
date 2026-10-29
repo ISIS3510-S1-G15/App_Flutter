@@ -9,6 +9,7 @@ import 'services/saved_service.dart';
 import 'services/review_service.dart';
 import 'services/occupancy_service.dart';
 import 'services/profile_service.dart';
+import 'services/pending_events.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -47,6 +48,7 @@ class _MainNavigationState extends State<MainNavigation> {
     ProfileService.load(); // the user's survey answers, from the backend
     ReviewService.loadSummaries(); // rating and number of reviews of every restaurant
     OccupancyService.loadAll(source: OccupancyRefreshSource.appOpen); // crowding level of every restaurant (badges)
+    PendingEvents.sendAll();
   }
 
   @override
