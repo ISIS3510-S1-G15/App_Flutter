@@ -14,6 +14,8 @@ class RecommendationAnalytics {
     };
     try {
       await _api.postJson(_path, body);
+    } on ApiException catch (e) {
+      debugPrint('Recommendation event rejected (${e.statusCode})');
     } catch (e) {
       debugPrint('Could not log recommendation, saved to send later: $e');
       await PendingEvents.add(_path, body);
