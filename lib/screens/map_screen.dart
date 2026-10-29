@@ -23,13 +23,14 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   String _filter = 'all'; // 'all' | 'open'
   Restaurant? _selected;
 
   // GPS state: the user's position (null until it is read), why it is unavailable, and if it is still loading
   Position? _position;
   String? _locationError;
+  LocationFix _locationFix = LocationFix.retry;
   bool _locating = true;
   StreamSubscription<Position>? _positionSub; // Live GPS updates while the screen is open
 
@@ -56,8 +57,14 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadLocation();
     _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() => _now = DateTime.now()));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _position == null && !_locating) _loadLocation();
   }
 
   @override
@@ -65,6 +72,7 @@ class _MapScreenState extends State<MapScreen> {
     // Stops the GPS and the clock when the screen is destroyed (saves battery)
     _positionSub?.cancel();
     _clock?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -81,6 +89,7 @@ class _MapScreenState extends State<MapScreen> {
       _locating = false;
       _position = result.position;
       _locationError = result.error;
+      _locationFix = result.fix;
     });
     _centerOnUser();
 
@@ -135,8 +144,8 @@ class _MapScreenState extends State<MapScreen> {
       return _LocationBanner(
         icon: Icons.location_off,
         text: _locationError ?? 'Location unavailable',
-        actionLabel: 'Retry',
-        onAction: _loadLocation,
+        actionLabel: _locationFix == LocationFix.retry ? 'Retry' : 'Open settings',
+        onAction: _locationFix == LocationFix.retry ? _loadLocation : () => LocationService.openSettingsFor(_locationFix),
       );
     }
     if (!LocationService.isOnCampus(_position!)) {
