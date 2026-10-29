@@ -1,12 +1,15 @@
 import 'package:geolocator/geolocator.dart';
 
 // Result of asking for the user's location: the position, or why it could not be read
+enum LocationFix { retry, appSettings, locationSettings }
+
 class LocationResult {
   final Position? position;
   final String? error; // Message shown to the user when the location is not available
+  final LocationFix fix;
 
-  const LocationResult.found(Position this.position) : error = null;
-  const LocationResult.unavailable(String this.error) : position = null;
+  const LocationResult.found(Position this.position) : error = null, fix = LocationFix.retry;
+  const LocationResult.unavailable(String this.error, {this.fix = LocationFix.retry}) : position = null;
 }
 
 // Wraps the phone's GPS (geolocator package): permissions, current position and distances.
@@ -24,14 +27,23 @@ class LocationService {
   static Future<LocationResult> getCurrentLocation() async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        return const LocationResult.unavailable('Turn on your location to see the closest spots');
+        return const LocationResult.unavailable(
+          'Turn on your location to see the closest spots',
+          fix: LocationFix.locationSettings,
+        );
       }
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.deniedForever) {
+        return const LocationResult.unavailable(
+          'Location access is blocked. Allow it in Settings to see the closest spots',
+          fix: LocationFix.appSettings,
+        );
+      }
+      if (permission == LocationPermission.denied) {
         return const LocationResult.unavailable('Allow location access to see the closest spots');
       }
 
@@ -43,6 +55,12 @@ class LocationService {
       return const LocationResult.unavailable('Could not get your location');
     }
   }
+
+  static Future<bool> openSettingsFor(LocationFix fix) => switch (fix) {
+        LocationFix.appSettings => Geolocator.openAppSettings(),
+        LocationFix.locationSettings => Geolocator.openLocationSettings(),
+        LocationFix.retry => Future.value(false),
+      };
 
   // Follows the user while the screen is open: emits a new position every time they move 10 m or more
   static Stream<Position> positionStream() => Geolocator.getPositionStream(
