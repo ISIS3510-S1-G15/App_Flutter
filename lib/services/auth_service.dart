@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
+import 'session_store.dart';
 
 // User authentication (Juan Felipe Ochoa)
 // - register / login against the FastAPI backend (/auth/register, /auth/login)
-// - keeps the session (JWT) on the phone so the user does not log in every time
+// - keeps the session (JWT) on the phone, encrypted with flutter_secure_storage (Camilo Tellez)
 // - restoreSession() validates the saved token with /auth/me when the app starts
 
 // The logged-in user, as answered by the backend
@@ -37,8 +37,6 @@ class AuthException implements Exception {
 
 class AuthService {
   static final ApiClient _api = ApiClient(); // Singleton shared with the other services
-  static const String _tokenKey = 'auth_token';
-  static const String _userKey = 'auth_user';
 
   // Who is logged in right now (null = nobody). Screens can listen to it, like userProfile
   static final ValueNotifier<AuthUser?> currentUser = ValueNotifier(null);
@@ -53,10 +51,10 @@ class AuthService {
 
   // Called when the app starts. Returns the user if there is a saved session, or null if the user must log in
   static Future<AuthUser?> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_tokenKey);
-    final savedUser = prefs.getString(_userKey);
-    if (token == null || savedUser == null) return null;
+    final session = await SessionStore.read();
+    if (session == null) return null;
+    final token = session.token;
+    final savedUser = session.user;
 
     _api.setToken(token);
     try {
@@ -77,9 +75,7 @@ class AuthService {
   }
 
   static Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_userKey);
+    await SessionStore.clear();
     _api.setToken(null); // from now on no service sends the old token
     currentUser.value = null;
   }
@@ -96,9 +92,7 @@ class AuthService {
     final token = data['access_token'] as String;
     final user = AuthUser.fromJson(data['user'] as Map<String, dynamic>);
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-    await prefs.setString(_userKey, jsonEncode(user.toJson()));
+    await SessionStore.save(token: token, user: jsonEncode(user.toJson()));
     _api.setToken(token);
     currentUser.value = user;
     return user;
