@@ -11,6 +11,8 @@ import '../services/location_service.dart';
 import '../services/map_tile_cache.dart';
 import '../services/meal_context.dart';
 import '../services/preference_match.dart';
+import '../services/occupancy_service.dart';
+import '../services/recommendation_analytics.dart';
 import '../data/profile_data.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -24,13 +26,17 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   String _filter = 'all'; // 'all' | 'open'
   Restaurant? _selected;
+  String? _loggedRecommendation;
+  Map<String, PreferenceMatch> _matches = const {};
+  int _matchesRun = 0;
 
   // GPS state: the user's position (null until it is read), why it is unavailable, and if it is still loading
   Position? _position;
   String? _locationError;
+  LocationFix _locationFix = LocationFix.retry;
   bool _locating = true;
   StreamSubscription<Position>? _positionSub; // Live GPS updates while the screen is open
 
@@ -58,8 +64,16 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    userProfile.addListener(_refreshMatches);
+    _refreshMatches();
     _loadLocation();
     _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() => _now = DateTime.now()));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _position == null && !_locating) _loadLocation();
   }
 
   @override
@@ -67,6 +81,8 @@ class _MapScreenState extends State<MapScreen> {
     // Stops the GPS and the clock when the screen is destroyed (saves battery)
     _positionSub?.cancel();
     _clock?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    userProfile.removeListener(_refreshMatches);
     super.dispose();
   }
 
@@ -83,18 +99,35 @@ class _MapScreenState extends State<MapScreen> {
       _locating = false;
       _position = result.position;
       _locationError = result.error;
+      _locationFix = result.fix;
     });
     _centerOnUser();
+    _refreshMatches();
 
     if (result.position != null) {
       _positionSub?.cancel();
       _positionSub = LocationService.positionStream().listen(
         (p) {
-          if (mounted) setState(() => _position = p);
+          if (!mounted) return;
+          setState(() => _position = p);
+          _refreshMatches();
         },
         onError: (_) {}, // Keeps the last known position if an update fails
       );
     }
+  }
+
+  Future<void> _refreshMatches() async {
+    final profile = userProfile.value;
+    final run = ++_matchesRun;
+    if (!PreferenceMatcher.hasPreferences(profile)) {
+      if (_matches.isNotEmpty) setState(() => _matches = const {});
+      return;
+    }
+    final distances = {for (final r in restaurants) r.id: _distanceTo(r)};
+    final result = await PreferenceMatcher.scoreAllInBackground(restaurants, profile, distances);
+    if (!mounted || run != _matchesRun) return;
+    setState(() => _matches = result);
   }
 
   double? _distanceTo(Restaurant r) =>
@@ -121,9 +154,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   String? _matchLabel(Restaurant r) {
-    final profile = userProfile.value;
-    if (!PreferenceMatcher.hasPreferences(profile)) return null;
-    final match = PreferenceMatcher.score(r, profile, distanceMeters: _distanceTo(r));
+    final match = _matches[r.id];
+    if (match == null) return null;
     final warning = match.warnings.isEmpty ? '' : ' · ${match.warnings.first}';
     return '${match.percent}% match for you$warning';
   }
@@ -137,8 +169,8 @@ class _MapScreenState extends State<MapScreen> {
       return _LocationBanner(
         icon: Icons.location_off,
         text: _locationError ?? 'Location unavailable',
-        actionLabel: 'Retry',
-        onAction: _loadLocation,
+        actionLabel: _locationFix == LocationFix.retry ? 'Retry' : 'Open settings',
+        onAction: _locationFix == LocationFix.retry ? _loadLocation : () => LocationService.openSettingsFor(_locationFix),
       );
     }
     if (!LocationService.isOnCampus(_position!)) {
@@ -158,13 +190,33 @@ class _MapScreenState extends State<MapScreen> {
     final meal = MealMoment.at(_now);
     final fitting = meal == null ? <Restaurant>[] : open.where((r) => meal.fits(r.category)).toList();
     final candidates = fitting.isNotEmpty ? fitting : open;
-    final profile = userProfile.value;
+    final personalized = candidates.every((r) => _matches.containsKey(r.id));
+    final ranked = personalized
+        ? ([...candidates]..sort((a, b) => _matches[b.id]!.percent.compareTo(_matches[a.id]!.percent)))
+        : candidates;
 
-    if (PreferenceMatcher.hasPreferences(profile)) {
-      final best = PreferenceMatcher.rank(candidates, profile, _distanceTo).first;
-      final match = PreferenceMatcher.score(best, profile, distanceMeters: _distanceTo(best));
+    final best = ranked.first;
+    final bestLevel = OccupancyService.statusOf(best.id).level;
+    final alternative = _isBusy(best) ? ranked.skip(1).where((r) => !_isBusy(r)).firstOrNull : null;
+    _logRecommendation(best, bestLevel, alternative);
+
+    final prefix = fitting.isNotEmpty ? '${meal!.label} time · ' : '';
+
+    if (alternative != null) {
+      final match = personalized
+          ? ' · ${_matches[alternative.id]!.percent}% match'
+          : '';
+      return _LocationBanner(
+        icon: Icons.swap_horiz,
+        text: '$prefix${best.name} is busy right now · Try ${alternative.name} instead$match · ${_distanceLabel(alternative)}',
+        actionLabel: 'Show',
+        onAction: () => _selectSpot(alternative),
+      );
+    }
+
+    if (personalized) {
+      final match = _matches[best.id]!;
       final why = match.summary.isEmpty ? '' : ' (${match.summary})';
-      final prefix = fitting.isNotEmpty ? '${meal!.label} time · ' : '';
       return _LocationBanner(
         icon: Icons.auto_awesome,
         text: '${prefix}Best match for you: ${best.name} · ${match.percent}% match$why · ${_distanceLabel(best)}',
@@ -173,16 +225,27 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
-    final pick = candidates.first;
     final text = fitting.isNotEmpty
-        ? '${meal!.label} time · Closest for ${meal.label.toLowerCase()}: ${pick.name} · ${_distanceLabel(pick)}'
-        : 'Closest open spot: ${pick.name} · ${_distanceLabel(pick)}';
+        ? '${meal!.label} time · Closest for ${meal.label.toLowerCase()}: ${best.name} · ${_distanceLabel(best)}'
+        : 'Closest open spot: ${best.name} · ${_distanceLabel(best)}';
     return _LocationBanner(
       icon: Icons.near_me,
       text: text,
       actionLabel: 'Show',
-      onAction: () => _selectSpot(pick),
+      onAction: () => _selectSpot(best),
     );
+  }
+
+  bool _isBusy(Restaurant r) {
+    final level = OccupancyService.statusOf(r.id).level;
+    return level != null && crowdingStyle(level).label == 'Busy';
+  }
+
+  void _logRecommendation(Restaurant best, double? level, Restaurant? alternative) {
+    final key = '${best.id}|${level == null ? 'none' : crowdingStyle(level).label}|${alternative?.id}';
+    if (key == _loggedRecommendation) return;
+    _loggedRecommendation = key;
+    RecommendationAnalytics.logShown(recommendedId: best.id, recommendedLevel: level, alternativeId: alternative?.id);
   }
 
   @override
@@ -369,7 +432,10 @@ class _MapScreenState extends State<MapScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 children: [
-                  _buildLocationBanner(),
+                  ValueListenableBuilder(
+                    valueListenable: OccupancyService.statuses,
+                    builder: (context, _, _) => _buildLocationBanner(),
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     _position != null ? 'Closest to you — ${visible.length} spots' : 'Nearby — ${visible.length} spots',
