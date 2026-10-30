@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/offline_banner.dart';
 import '../data/restaurants_data.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
@@ -139,6 +140,10 @@ class _SearchScreenState extends State<SearchScreen> {
         // Prevents the content from appearing below the phone's status bar (time, battery, etc.)
         child: Column(
           children: [
+            const OfflineBanner(
+              message: "You're offline. Search still works with the restaurants on this phone, and searches with no results will be sent when you're back online.",
+              margin: EdgeInsets.fromLTRB(20, 12, 20, 0),
+            ),
             // ---------- HEADER: "Search" title + search box ----------
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),

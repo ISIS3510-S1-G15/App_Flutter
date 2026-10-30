@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/offline_banner.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/occupancy_survey.dart';
@@ -59,10 +60,10 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Future<void> _onToggleSaved() async {
-    // The icon changes right away; if the server can't be reached it goes back and the user is told
-    final ok = await SavedService.toggle(widget.restaurant.id);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not update your saved spots')));
+    final synced = await SavedService.toggle(widget.restaurant.id);
+    if (!synced && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Change kept on this phone. It will sync when you're back online.")));
     }
   }
 
@@ -113,6 +114,13 @@ class _DetailScreenState extends State<DetailScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      bottomNavigationBar: const SafeArea(
+        top: false,
+        child: OfflineBanner(
+          message: "You're offline. Crowding and ratings may be outdated. You can still save this place and it will sync later.",
+          margin: EdgeInsets.fromLTRB(16, 0, 16, 8),
+        ),
+      ),
       body: ListView(
         padding: EdgeInsets.zero,
         children: [

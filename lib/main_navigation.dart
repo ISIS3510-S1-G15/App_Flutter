@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -12,6 +10,7 @@ import 'services/review_service.dart';
 import 'services/occupancy_service.dart';
 import 'services/profile_service.dart';
 import 'services/pending_events.dart';
+import 'services/connectivity_service.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -22,7 +21,6 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
-  StreamSubscription<List<ConnectivityResult>>? _connectionSub;
   int _previousIndex = 0; // Tab that was open before the current one, so Profile's back button can return to it
 
   // Built as a getter (not a const list) because ProfileScreen needs a callback that references this State
@@ -53,21 +51,7 @@ class _MainNavigationState extends State<MainNavigation> {
     ReviewService.loadSummaries(); // rating and number of reviews of every restaurant
     OccupancyService.loadAll(source: OccupancyRefreshSource.appOpen); // crowding level of every restaurant (badges)
     PendingEvents.sendAll();
-    _connectionSub = Connectivity().onConnectivityChanged.listen((results) {
-      if (!results.contains(ConnectivityResult.none)) {
-        Future.delayed(const Duration(seconds: 3), () {
-          PendingEvents.sendAll();
-          SavedService.load();
-          ProfileService.syncPending();
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _connectionSub?.cancel();
-    super.dispose();
+    ConnectivityService.start();
   }
 
   @override

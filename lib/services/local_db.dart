@@ -7,7 +7,7 @@ class LocalDb {
   static Future<Database> get _database async {
     _db ??= await openDatabase(
       join(await getDatabasesPath(), 'campus_eats_local.db'),
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE saved_restaurants (
@@ -15,9 +15,24 @@ class LocalDb {
             saved_at TEXT NOT NULL
           )
         ''');
+        await _createPendingTable(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createPendingTable(db);
       },
     );
     return _db!;
+  }
+
+  static Future<void> _createPendingTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE pending_saved_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        restaurant_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
   }
 
   static Future<Set<String>> getSavedIds() async {
@@ -54,5 +69,29 @@ class LocalDb {
   static Future<void> clearSaved() async {
     final db = await _database;
     await db.delete('saved_restaurants');
+  }
+
+  static Future<void> addPendingChange(String restaurantId, String action) async {
+    final db = await _database;
+    await db.insert('pending_saved_changes', {
+      'restaurant_id': restaurantId,
+      'action': action,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static Future<List<Map<String, Object?>>> getPendingChanges() async {
+    final db = await _database;
+    return db.query('pending_saved_changes', orderBy: 'id ASC');
+  }
+
+  static Future<void> removePendingChange(int id) async {
+    final db = await _database;
+    await db.delete('pending_saved_changes', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> clearPendingChanges() async {
+    final db = await _database;
+    await db.delete('pending_saved_changes');
   }
 }
