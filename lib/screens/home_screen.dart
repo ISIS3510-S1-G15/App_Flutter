@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../data/restaurants_data.dart';
+import '../services/restaurant_service.dart';
 import '../data/profile_data.dart';
 import '../models/restaurant.dart';
 import '../utils/text_utils.dart';
@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Runs ONLY once, when the screen is first created
     super.initState();
     userProfile.addListener(_onProfileChanged);
+    RestaurantService.restaurants.addListener(_onProfileChanged); // redraws when the list arrives from the backend
     // Listens to the profile saved by the survey, so the greeting and avatar update if the user edits it
     _clock = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
@@ -47,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     // Stops listening when the screen is destroyed (otherwise it would try to redraw a screen that no longer exists)
     userProfile.removeListener(_onProfileChanged);
+    RestaurantService.restaurants.removeListener(_onProfileChanged);
     _clock?.cancel(); // stops the timer, otherwise it would keep running after the screen is gone
     super.dispose();
   }
@@ -55,8 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Restaurant> get _filtered {
     // Restaurants that belong to the active category (or all of them if 'All' is selected)
-    if (_activeCategory == 'All') return restaurants;
-    return restaurants.where((r) => r.category == _activeCategory).toList();
+    if (_activeCategory == 'All') return RestaurantService.restaurants.value;
+    return RestaurantService.restaurants.value.where((r) => r.category == _activeCategory).toList();
   }
 
   void _onCategoryTap(String cat) {
@@ -88,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     final mealSlot = mealSlotFor(now);
     // Today's Pick: best rated restaurant that is OPEN RIGHT NOW according to its opening hours (null if all are closed)
-    final featured = contextualPick(restaurants, now);
+    final featured = contextualPick(RestaurantService.restaurants.value, now);
     // True if, in the survey, the user said they usually eat at this moment of the day
     final usualMealTime = profile.mealTimes.contains(mealSlot);
 

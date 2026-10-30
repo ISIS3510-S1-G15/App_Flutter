@@ -8,6 +8,7 @@ import 'screens/profile_screen.dart';
 import 'services/saved_service.dart';
 import 'services/review_service.dart';
 import 'services/occupancy_service.dart';
+import 'services/restaurant_service.dart';
 import 'services/profile_service.dart';
 import 'services/pending_events.dart';
 import 'services/connectivity_service.dart';
@@ -46,6 +47,7 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
+    RestaurantService.load(); // the restaurant list, from the backend (cached on the phone for offline use)
     SavedService.load(); // the user's saved restaurants, from the backend
     ProfileService.load(); // the user's survey answers, from the backend
     ReviewService.loadSummaries(); // rating and number of reviews of every restaurant

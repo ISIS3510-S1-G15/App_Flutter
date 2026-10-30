@@ -1,5 +1,5 @@
-// List of restaurants for testing
-import '../models/restaurant.dart';
+// Fixed restaurant list used only by the tests (the app loads them from the backend)
+import 'package:app_flutter/models/restaurant.dart';
 
 final List<Restaurant> restaurants = [
   const Restaurant(
