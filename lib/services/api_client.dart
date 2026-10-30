@@ -43,6 +43,16 @@ class ApiClient {
     return _decode(response);
   }
 
+  // GET a path and return the RAW JSON text, without decoding it.
+  // For big answers that are decoded in a background isolate instead of on the UI thread (slides 19, PPoF)
+  Future<String> getRawJson(String path) async {
+    final response = await _http.get(_uri(path), headers: _headers()).timeout(timeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(response.statusCode, response.body);
+    }
+    return response.body;
+  }
+
   // POST a JSON body to a path and return the decoded JSON answer
   Future<dynamic> postJson(String path, Map<String, dynamic> body) async {
     final response = await _http

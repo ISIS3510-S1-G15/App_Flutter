@@ -1,7 +1,9 @@
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import '../models/review.dart';
 import 'api_client.dart';
 import 'reviews_db.dart';
+import 'reviews_digest.dart';
 import 'reviews_memory_cache.dart';
 
 // Rating of one restaurant, CALCULATED by the backend from the real reviews (before it was a fixed number)
@@ -28,12 +30,28 @@ class RestaurantReviews {
   final List<Review> reviews;
   final bool fromCache;
   final DateTime? savedAt; // when this copy came from the backend, so the offline banner can say how old it is
+  // Precalculated once per load (reviews_digest.dart, in an isolate) so the screen does not redo them on every build()
+  final Map<String, double> averages; // 'taste', 'attention', 'price', 'options' -> 0-5
+  final List<({String diet, int count})> topDiets; // most mentioned first
 
-  const RestaurantReviews({required this.summary, required this.reviews, this.fromCache = false, this.savedAt});
+  const RestaurantReviews({
+    required this.summary,
+    required this.reviews,
+    this.fromCache = false,
+    this.savedAt,
+    this.averages = const {},
+    this.topDiets = const [],
+  });
 
   // A copy, so the object stored in the cache is never mutated
-  RestaurantReviews get asFromCache =>
-      RestaurantReviews(summary: summary, reviews: reviews, fromCache: true, savedAt: savedAt);
+  RestaurantReviews get asFromCache => RestaurantReviews(
+        summary: summary,
+        reviews: reviews,
+        fromCache: true,
+        savedAt: savedAt,
+        averages: averages,
+        topDiets: topDiets,
+      );
 }
 
 // Design pattern: REPOSITORY (slides 17 - Caching). The screens never call the backend directly:
@@ -76,8 +94,11 @@ class ReviewService {
     }
     debugPrint('Reviews cache miss: $restaurantId, asking the backend');
     try {
-      final data = await _api.getJson('/restaurants/$restaurantId/reviews') as Map<String, dynamic>;
-      final result = _parse(data, savedAt: DateTime.now());
+      // I/O: a Future. While waiting for the network the UI thread is free, so no isolate is needed here
+      final body = await _api.getRawJson('/restaurants/$restaurantId/reviews');
+      // CPU: decode + build the reviews + averages + diet counts in a background isolate, ONCE per load
+      // instead of on every build() of the screen (slides 19). The closure only captures the local body
+      final result = await Isolate.run(() => digestReviewsJson(body));
       _memory.put(restaurantId, result, fromNetwork: true);
       _setSummary(restaurantId, result.summary);
       await _saveLocally(restaurantId, result); // "Cached on network response" (slides 15)
@@ -86,15 +107,6 @@ class ReviewService {
       debugPrint('Could not load reviews of $restaurantId: $e');
       return _fromLocal(restaurantId);
     }
-  }
-
-  static RestaurantReviews _parse(Map<String, dynamic> data, {bool fromCache = false, DateTime? savedAt}) {
-    return RestaurantReviews(
-      summary: RatingSummary.fromJson(data),
-      reviews: (data['reviews'] as List).cast<Map<String, dynamic>>().map(Review.fromJson).toList(),
-      fromCache: fromCache,
-      savedAt: savedAt,
-    );
   }
 
   // Own try/catch: a disk error must not fall into the network catch, the network answer was fine
@@ -113,8 +125,7 @@ class ReviewService {
     try {
       final stored = await ReviewsDb.read(restaurantId);
       if (stored == null) return null;
-      final result = _parse(stored,
-          fromCache: true, savedAt: DateTime.parse(stored['synced_at'] as String).toLocal());
+      final result = await Isolate.run(() => digestReviews(stored, fromCache: true));
       // fromNetwork: false so the next fetch still tries the backend instead of treating it as a hit
       _memory.put(restaurantId, result, fromNetwork: false);
       _setSummary(restaurantId, result.summary);
