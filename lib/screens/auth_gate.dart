@@ -5,6 +5,7 @@ import '../data/profile_data.dart';
 import '../models/survey_answers.dart';
 import '../services/auth_service.dart';
 import '../services/saved_service.dart';
+import '../services/review_service.dart';
 import '../widgets/app_open_tracker.dart';
 import 'login_screen.dart';
 import 'survey_screen.dart';
@@ -38,6 +39,7 @@ class AuthGate extends StatefulWidget {
     final navigator = Navigator.of(context, rootNavigator: true);
     await AuthService.logout();
     await SavedService.clear();
+    await ReviewService.clearLocal(); // the next account must not see a local copy that includes other people's names
     userProfile.value = const SurveyAnswers(); // the next person must not see this user's preferences
     navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
   }
