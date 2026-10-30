@@ -40,10 +40,11 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  // force = the user tapped Retry ("pull on user demand", slides 15): they want new data, not the memory copy
+  Future<void> _load({bool force = false}) async {
     // initState already starts with _loading = true (setState is not allowed inside initState)
     if (!_loading) setState(() => _loading = true);
-    final data = await ReviewService.fetch(restaurant.id); // backend, or the cached copy if offline
+    final data = await ReviewService.fetch(restaurant.id, forceRefresh: force); // backend, or the cached copy if offline
     if (!mounted) return; // the user closed the screen before the answer arrived
     setState(() {
       _data = data ?? _data;
@@ -93,7 +94,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                               style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.muted),
                             ),
                             const SizedBox(height: 16),
-                            TextButton(onPressed: _load, child: const Text('Retry')),
+                            TextButton(onPressed: () => _load(force: true), child: const Text('Retry')),
                           ],
                         ),
                       ),
@@ -169,7 +170,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                             ),
                           ),
                           GestureDetector(
-                            onTap: _load,
+                            onTap: () => _load(force: true),
                             child: const Text('Retry',
                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
                           ),
