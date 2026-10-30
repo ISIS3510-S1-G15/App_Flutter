@@ -3,6 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'pending_events.dart';
 import 'saved_service.dart';
+import 'profile_service.dart';
 
 class ConnectivityService {
   static final ValueNotifier<bool> isOnline = ValueNotifier(true);
@@ -23,9 +24,10 @@ class ConnectivityService {
     final cameBack = online && !isOnline.value;
     isOnline.value = online;
     if (cameBack) {
-      Future.delayed(const Duration(seconds: 3), () {
+            Future.delayed(const Duration(seconds: 3), () {
         PendingEvents.sendAll();
         SavedService.load();
+        ProfileService.syncPending();
       });
     }
   }
