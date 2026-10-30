@@ -5,6 +5,7 @@ import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/rating_text.dart';
 import '../services/saved_service.dart';
+import '../widgets/offline_banner.dart';
 import 'detail_screen.dart';
 import '../data/profile_data.dart';
 
@@ -61,9 +62,22 @@ class SavedScreen extends StatelessWidget {
                               style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.closed),
                             ),
                     ),
+                    ValueListenableBuilder<int>(
+                      valueListenable: SavedService.pendingChanges,
+                      builder: (context, pending, _) => pending == 0
+                          ? const SizedBox.shrink()
+                          : Text(
+                              pending == 1 ? '1 change waiting to sync' : '$pending changes waiting to sync',
+                              style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.accent),
+                            ),
+                    ),
                   ],
                 ),
               ],
+            ),
+            const OfflineBanner(
+              message: "You're offline. These are your saved spots from the last sync. You can still save or remove places, and the changes will sync when you're back online.",
+              margin: EdgeInsets.only(top: 12),
             ),
             const SizedBox(height: 20),
 
