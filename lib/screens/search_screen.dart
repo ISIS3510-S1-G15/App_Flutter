@@ -10,6 +10,7 @@ import '../widgets/rating_text.dart';
 import 'detail_screen.dart';
 import '../services/search_analytics.dart'; // logs searches with no results to the backend
 import '../utils/search_filter.dart';
+import '../utils/lru_cache.dart';
 import '../services/pending_events.dart';
 
 // Fixed lists of sample data (not yet sourced from an actual database)
@@ -61,6 +62,8 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  static final LruCache<String, List<Restaurant>> _resultsCache = LruCache(20);
+
   // Runs the search matching in a SEPARATE ISOLATE (another thread with its own memory).
   // Comparing the text against every restaurant is CPU work, not waiting, so a Future alone would still
   // run it on the UI thread; Isolate.run moves it off the UI thread so typing never stutters,
@@ -90,7 +93,17 @@ class _SearchScreenState extends State<SearchScreen> {
   // async/await: waits for the isolate's answer without blocking the screen
   Future<void> _runSearch() async {
     final id = ++_searchId;
-    final found = await _searchInIsolate(_query);
+    final key = _query.trim().toLowerCase();
+    final cached = _resultsCache.get(key);
+    final List<Restaurant> found;
+    if (cached != null) {
+      debugPrint('Search cache hit: "$key" (${_resultsCache.length}/${_resultsCache.maxSize} cached)');
+      found = cached;
+    } else {
+      debugPrint('Search cache miss: "$key", searching in the isolate');
+      found = List.unmodifiable(await _searchInIsolate(_query));
+      _resultsCache.put(key, found);
+    }
     // If the user kept typing (a newer search started) or left the screen, this answer is thrown away
     if (!mounted || id != _searchId) return;
     setState(() {
