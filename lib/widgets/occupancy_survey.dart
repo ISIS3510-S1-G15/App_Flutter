@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/occupancy_service.dart';
+import '../services/connectivity_service.dart';
 
 class OccupancySurvey extends StatelessWidget {
   final String restaurantId;
@@ -44,17 +45,30 @@ class OccupancySurvey extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Are you at $restaurantName?', style: AppTextStyles.cardTitle.copyWith(fontSize: 16)),
-      content: Text(
-        'Help other students by reporting how busy it is right now.',
-        style: AppTextStyles.body.copyWith(fontSize: 13, color: AppColors.closed),
+    // Offline the dialog explains why it cannot report instead of "accepting" a report that fails 5 s later
+    // (anti-patterns #5/#8). Not queued for the same reason as in _submit: the report describes "right now".
+    // If the connection comes back with the dialog open, the 3 options appear by themselves (anti-pattern #7)
+    return ValueListenableBuilder<bool>(
+      valueListenable: ConnectivityService.isOnline,
+      builder: (context, online, _) => AlertDialog(
+        title: Text('Are you at $restaurantName?', style: AppTextStyles.cardTitle.copyWith(fontSize: 16)),
+        content: Text(
+          online
+              ? 'Help other students by reporting how busy it is right now.'
+              : "You're offline. Crowding reports need internet because they describe how busy it is right now"
+                  ' — a report sent later would be wrong for everyone.',
+          style: AppTextStyles.body.copyWith(fontSize: 13, color: AppColors.closed),
+        ),
+        actions: online
+            ? [
+                _optionButton(context, 0, 'Not crowded', AppColors.open),
+                _optionButton(context, 1, 'Moderate', AppColors.accent),
+                _optionButton(context, 2, 'Busy', AppColors.closed),
+              ]
+            : [
+                TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+              ],
       ),
-      actions: [
-        _optionButton(context, 0, 'Not crowded', AppColors.open),
-        _optionButton(context, 1, 'Moderate', AppColors.accent),
-        _optionButton(context, 2, 'Busy', AppColors.closed),
-      ],
     );
   }
 

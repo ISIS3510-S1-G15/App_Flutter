@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import '../services/connectivity_service.dart';
+import '../widgets/offline_banner.dart';
 import '../widgets/primary_button.dart';
 import 'auth_gate.dart';
 
@@ -70,6 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       AuthGate.enterApp(context, user, isNewUser: _isRegister);
     } on AuthException catch (e) {
+      // Still needed with the offline check in build(): on a Wi-Fi without internet connectivity_plus reports
+      // "online", so the timeout + this message is the fallback
       if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -131,9 +135,24 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
             const SizedBox(height: 24),
 
+            // Proactive detection (slides 15, anti-pattern #8): the user knows BEFORE tapping, instead of after a
+            // 5 s timeout. Only a new login is blocked: restoring a saved session offline already works
+            // (AuthService.restoreSession -> _offlineUser)
+            const OfflineBanner(
+              margin: EdgeInsets.only(bottom: 12),
+              message: "You're offline. Logging in and creating an account need internet; "
+                  "we'll enable the button when you're back online.",
+            ),
             _loading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-                : AppPrimaryButton(label: _isRegister ? 'Create account' : 'Log in', onTap: _submit),
+                // Rebuilds by itself when the connection comes back (anti-pattern #7)
+                : ValueListenableBuilder<bool>(
+                    valueListenable: ConnectivityService.isOnline,
+                    builder: (context, online, _) => AppPrimaryButton(
+                      label: _isRegister ? 'Create account' : 'Log in',
+                      onTap: online ? _submit : null,
+                    ),
+                  ),
             const SizedBox(height: 16),
 
             // Switches between "Log in" and "Create account"

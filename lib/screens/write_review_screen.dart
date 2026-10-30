@@ -3,6 +3,8 @@ import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../models/review.dart';
 import '../services/review_service.dart';
+import '../services/connectivity_service.dart';
+import '../widgets/offline_banner.dart';
 import '../widgets/back_header.dart';
 import '../widgets/multi_select.dart';
 import '../widgets/app_text_field.dart';
@@ -199,22 +201,38 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
               ),
             ),
 
-            // Submit: disabled (grey) until the 4 categories are rated
+            // Submit: disabled (grey) until the 4 categories are rated AND there is internet.
+            // Still Network only (slides 15): offline the user can keep filling the form, and nothing is lost because
+            // it is the same State (unlike case studies 2/3, where the whole form was lost)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 children: [
-                  if (!_allRated)
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        'Please rate all 4 categories to submit',
-                        style: TextStyle(fontSize: 11, color: AppColors.mutedLight),
-                      ),
+                  const OfflineBanner(
+                    margin: EdgeInsets.only(bottom: 8),
+                    message: "You're offline. Your answers stay here: you can send the review when you're back online.",
+                  ),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: ConnectivityService.isOnline,
+                    builder: (context, online, _) => Column(
+                      children: [
+                        if (!online || !_allRated)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              !online
+                                  ? 'Connect to the internet to send your review'
+                                  : 'Please rate all 4 categories to submit',
+                              style: const TextStyle(fontSize: 11, color: AppColors.mutedLight),
+                            ),
+                          ),
+                        AppPrimaryButton(
+                          label: _sending ? 'Sending...' : 'Submit Review',
+                          // disabled while sending: no duplicates
+                          onTap: online && _allRated && !_sending ? _submit : null,
+                        ),
+                      ],
                     ),
-                  AppPrimaryButton(
-                    label: _sending ? 'Sending...' : 'Submit Review',
-                    onTap: _allRated && !_sending ? _submit : null, // disabled while sending: no duplicates
                   ),
                 ],
               ),
