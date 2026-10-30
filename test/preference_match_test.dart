@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app_flutter/data/restaurants_data.dart';
+import 'fixtures/restaurants_fixture.dart';
 import 'package:app_flutter/models/survey_answers.dart';
 import 'package:app_flutter/services/preference_match.dart';
 

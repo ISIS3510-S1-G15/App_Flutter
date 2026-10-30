@@ -3,7 +3,7 @@ import 'dart:isolate';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/offline_banner.dart';
-import '../data/restaurants_data.dart';
+import '../services/restaurant_service.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/rating_text.dart';
@@ -51,11 +51,24 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() => _focused = _focusNode.hasFocus);
       // ...updates "_focused" and tells Flutter to redraw the screen
     });
+    RestaurantService.restaurants.addListener(_onRestaurantsChanged);
+  }
+
+  // When a new list arrives from the backend, old cached results are stale: clear them and search again
+  void _onRestaurantsChanged() {
+    _resultsCache.clear();
+    if (!mounted) return;
+    if (_query.trim().isEmpty) {
+      setState(() {});
+    } else {
+      _runSearch();
+    }
   }
 
   @override
   void dispose() {
     // Runs when the screen is destroyed (the user navigates to another screen)
+    RestaurantService.restaurants.removeListener(_onRestaurantsChanged);
     _debounce?.cancel();   // stops a pending search
     _controller.dispose(); // frees up the text controller's memory
     _focusNode.dispose();  // frees the memory of the focus node
@@ -69,7 +82,7 @@ class _SearchScreenState extends State<SearchScreen> {
   // run it on the UI thread; Isolate.run moves it off the UI thread so typing never stutters,
   // even when the catalog grows to hundreds of restaurants
   static Future<List<Restaurant>> _searchInIsolate(String query) {
-    final all = restaurants; // copied into the new isolate
+    final all = RestaurantService.restaurants.value; // copied into the new isolate
     return Isolate.run(() => filterRestaurants(all, query));
   }
 
@@ -295,7 +308,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     const SizedBox(height: 8),
                     ..._recentNames.map((name) {
                       // For each name in _recentNames, find the corresponding actual restaurant
-                      final match = restaurants.where((r) => r.name == name);
+                      final match = RestaurantService.restaurants.value.where((r) => r.name == name);
                       final r = match.isNotEmpty ? match.first : null;
                       // If it can't find it (for example, the name isn't in the list), r is set to null
 
@@ -365,7 +378,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     // --- All Restaurants ---
                     Text('All Restaurants', style: AppTextStyles.cardTitle.copyWith(fontSize: 13)),
                     const SizedBox(height: 10),
-                    ...restaurants.map((r) => Padding(
+                    ...RestaurantService.restaurants.value.map((r) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _SearchResultRow(
                             restaurant: r,

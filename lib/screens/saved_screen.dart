@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../data/restaurants_data.dart';
+import '../services/restaurant_service.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/rating_text.dart';
@@ -24,17 +24,21 @@ class SavedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Redraws the screen every time the user's saved list changes (loaded from the backend or toggled in a detail)
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: SavedService.savedIds,
-      builder: (context, savedIds, _) => _buildContent(context, savedIds),
+    // Also redraws when the restaurant list arrives from the backend
+    return ValueListenableBuilder<List<Restaurant>>(
+      valueListenable: RestaurantService.restaurants,
+      builder: (context, _, __) => ValueListenableBuilder<Set<String>>(
+        valueListenable: SavedService.savedIds,
+        builder: (context, savedIds, _) => _buildContent(context, savedIds),
+      ),
     );
   }
 
   Widget _buildContent(BuildContext context, Set<String> savedIds) {
     // Filters the full restaurant list into three groups used across this screen
-    final saved = restaurants.where((r) => savedIds.contains(r.id)).toList();
-    final openNow = restaurants.where((r) => r.isOpenNow).take(3).toList();
-    final recentlyViewed = restaurants.where((r) => !savedIds.contains(r.id)).take(4).toList();
+    final saved = RestaurantService.restaurants.value.where((r) => savedIds.contains(r.id)).toList();
+    final openNow = RestaurantService.restaurants.value.where((r) => r.isOpenNow).take(3).toList();
+    final recentlyViewed = RestaurantService.restaurants.value.where((r) => !savedIds.contains(r.id)).take(4).toList();
     final dietaryPreferences = userProfile.value.dietaryRestrictions.where((d) => d != 'None').toList();
 
     return Scaffold(

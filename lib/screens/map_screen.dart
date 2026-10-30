@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../data/restaurants_data.dart';
+import '../services/restaurant_service.dart';
 import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/rating_text.dart';
@@ -66,6 +66,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     userProfile.addListener(_refreshMatches);
+    RestaurantService.restaurants.addListener(_onRestaurantsChanged); // pins and matches follow the backend list
     _refreshMatches();
     _loadLocation();
     _clock = Timer.periodic(const Duration(minutes: 1), (_) => setState(() => _now = DateTime.now()));
@@ -83,7 +84,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _clock?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     userProfile.removeListener(_refreshMatches);
+    RestaurantService.restaurants.removeListener(_onRestaurantsChanged);
     super.dispose();
+  }
+
+  void _onRestaurantsChanged() {
+    if (!mounted) return;
+    setState(() {});
+    _refreshMatches();
   }
 
   // Asks for permission and reads the GPS when the screen opens (and again if the user taps "Retry"),
@@ -124,8 +132,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       if (_matches.isNotEmpty) setState(() => _matches = const {});
       return;
     }
-    final distances = {for (final r in restaurants) r.id: _distanceTo(r)};
-    final result = await PreferenceMatcher.scoreAllInBackground(restaurants, profile, distances);
+    final distances = {for (final r in RestaurantService.restaurants.value) r.id: _distanceTo(r)};
+    final result = await PreferenceMatcher.scoreAllInBackground(RestaurantService.restaurants.value, profile, distances);
     if (!mounted || run != _matchesRun) return;
     setState(() => _matches = result);
   }
@@ -180,7 +188,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         text: "You're ${LocationService.formatDistance(d)} away from campus",
       );
     }
-    final open = restaurants.where((r) => r.isOpenNow).toList()
+    final open = RestaurantService.restaurants.value.where((r) => r.isOpenNow).toList()
       ..sort((a, b) => _distanceTo(a)!.compareTo(_distanceTo(b)!));
     if (open.isEmpty) {
       return const _LocationBanner(icon: Icons.near_me, text: 'No spots are open near you right now');
@@ -250,7 +258,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final visible = _filter == 'all' ? restaurants.toList() : restaurants.where((r) => r.isOpenNow).toList();
+    final visible = _filter == 'all' ? RestaurantService.restaurants.value.toList() : RestaurantService.restaurants.value.where((r) => r.isOpenNow).toList();
     // Context-aware: when the user's location is known, the closest spots go first
     if (_position != null) {
       visible.sort((a, b) => _distanceTo(a)!.compareTo(_distanceTo(b)!));
