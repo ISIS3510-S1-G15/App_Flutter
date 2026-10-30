@@ -40,10 +40,11 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  // force = the user tapped Retry ("pull on user demand", slides 15): they want new data, not the memory copy
+  Future<void> _load({bool force = false}) async {
     // initState already starts with _loading = true (setState is not allowed inside initState)
     if (!_loading) setState(() => _loading = true);
-    final data = await ReviewService.fetch(restaurant.id); // backend, or the cached copy if offline
+    final data = await ReviewService.fetch(restaurant.id, forceRefresh: force); // backend, or the cached copy if offline
     if (!mounted) return; // the user closed the screen before the answer arrived
     setState(() {
       _data = data ?? _data;
@@ -93,7 +94,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                               style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.muted),
                             ),
                             const SizedBox(height: 16),
-                            TextButton(onPressed: _load, child: const Text('Retry')),
+                            TextButton(onPressed: () => _load(force: true), child: const Text('Retry')),
                           ],
                         ),
                       ),
@@ -110,15 +111,8 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
     // The big number and the count come from the backend (it uses ALL the reviews, the list may be only the newest 50)
     final overall = data.summary.rating ?? 0.0;
     final reviewCount = data.summary.count;
-
-    // Counts how many reviews mention each dietary option, and keeps the 5 most mentioned
-    final dietCounts = <String, int>{};
-    for (final r in reviews) {
-      for (final d in r.dietaryOptions) {
-        dietCounts[d] = (dietCounts[d] ?? 0) + 1;
-      }
-    }
-    final topDiets = dietCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    // Averages and the 5 most mentioned diets arrive precalculated (ReviewService, in an isolate)
+    final topDiets = data.topDiets;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -169,7 +163,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                             ),
                           ),
                           GestureDetector(
-                            onTap: _load,
+                            onTap: () => _load(force: true),
                             child: const Text('Retry',
                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent)),
                           ),
@@ -213,7 +207,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                                       padding: const EdgeInsets.symmetric(vertical: 4),
                                       child: _CategoryBar(
                                         label: c.label,
-                                        value: _average(reviews, c.key),
+                                        value: data.averages[c.key] ?? 0,
                                       ),
                                     ),
                                 ],
@@ -236,7 +230,6 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                             spacing: 6,
                             runSpacing: 6,
                             children: topDiets
-                                .take(5)
                                 .map((e) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
@@ -244,7 +237,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                                         borderRadius: BorderRadius.circular(999),
                                       ),
                                       child: Text(
-                                        '${e.key} · ${e.value}',
+                                        '${e.diet} · ${e.count}',
                                         style: const TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w600,
@@ -305,12 +298,6 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
         ),
       ),
     );
-  }
-
-  // Average rating of one category across all the reviews (0 if there are no reviews)
-  double _average(List<Review> reviews, String key) {
-    if (reviews.isEmpty) return 0;
-    return reviews.map((r) => r.ratings.byKey(key)).reduce((a, b) => a + b) / reviews.length;
   }
 }
 
