@@ -162,7 +162,9 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              "You're offline. Showing the reviews from your last visit.",
+                              data.savedAt != null
+                                  ? "You're offline. Showing reviews saved on ${formatDate(data.savedAt!)}."
+                                  : "You're offline. Showing the reviews from your last visit.",
                               style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.dark),
                             ),
                           ),

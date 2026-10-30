@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/review.dart';
 import 'api_client.dart';
+import 'reviews_db.dart';
 
 // Rating of one restaurant, CALCULATED by the backend from the real reviews (before it was a fixed number)
 class RatingSummary {
@@ -25,12 +26,13 @@ class RestaurantReviews {
   final RatingSummary summary;
   final List<Review> reviews;
   final bool fromCache;
+  final DateTime? savedAt; // when this copy came from the backend, so the offline banner can say how old it is
 
-  const RestaurantReviews({required this.summary, required this.reviews, this.fromCache = false});
+  const RestaurantReviews({required this.summary, required this.reviews, this.fromCache = false, this.savedAt});
 }
 
 // Design pattern: REPOSITORY (slides 17 - Caching). The screens never call the backend directly:
-// they ask ReviewService, and it decides where the data comes from (backend or the in-memory cache).
+// they ask ReviewService, and it decides where the data comes from (backend, memory or the local SQLite copy).
 // Same style as SavedService: static methods + ValueNotifier so the screens redraw when the data changes
 class ReviewService {
   static final ApiClient _api = ApiClient(); // Singleton: already carries the user's session token
@@ -61,19 +63,63 @@ class ReviewService {
   static Future<RestaurantReviews?> fetch(String restaurantId) async {
     try {
       final data = await _api.getJson('/restaurants/$restaurantId/reviews') as Map<String, dynamic>;
-      final result = RestaurantReviews(
-        summary: RatingSummary.fromJson(data),
-        reviews: (data['reviews'] as List).cast<Map<String, dynamic>>().map(Review.fromJson).toList(),
-      );
+      final result = _parse(data, savedAt: DateTime.now());
+      _cache[restaurantId] = result;
+      _setSummary(restaurantId, result.summary);
+      await _saveLocally(restaurantId, result); // "Cached on network response" (slides 15)
+      return result;
+    } catch (e) {
+      debugPrint('Could not load reviews of $restaurantId: $e');
+      return _fromLocal(restaurantId);
+    }
+  }
+
+  static RestaurantReviews _parse(Map<String, dynamic> data, {bool fromCache = false, DateTime? savedAt}) {
+    return RestaurantReviews(
+      summary: RatingSummary.fromJson(data),
+      reviews: (data['reviews'] as List).cast<Map<String, dynamic>>().map(Review.fromJson).toList(),
+      fromCache: fromCache,
+      savedAt: savedAt,
+    );
+  }
+
+  // Own try/catch: a disk error must not fall into the network catch, the network answer was fine
+  static Future<void> _saveLocally(String restaurantId, RestaurantReviews result) async {
+    try {
+      await ReviewsDb.save(restaurantId, result.summary, result.reviews);
+    } catch (e) {
+      debugPrint('Could not save reviews of $restaurantId locally: $e');
+    }
+  }
+
+  // Memory first (fastest), then the SQLite copy, which survives closing the app
+  static Future<RestaurantReviews?> _fromLocal(String restaurantId) async {
+    final cached = _cache[restaurantId];
+    if (cached != null) {
+      return RestaurantReviews(
+          summary: cached.summary, reviews: cached.reviews, fromCache: true, savedAt: cached.savedAt);
+    }
+    try {
+      final stored = await ReviewsDb.read(restaurantId);
+      if (stored == null) return null;
+      final result = _parse(stored,
+          fromCache: true, savedAt: DateTime.parse(stored['synced_at'] as String).toLocal());
       _cache[restaurantId] = result;
       _setSummary(restaurantId, result.summary);
       return result;
     } catch (e) {
-      debugPrint('Could not load reviews of $restaurantId: $e');
-      final cached = _cache[restaurantId];
-      return cached == null
-          ? null
-          : RestaurantReviews(summary: cached.summary, reviews: cached.reviews, fromCache: true);
+      debugPrint('Could not read local reviews of $restaurantId: $e');
+      return null;
+    }
+  }
+
+  // Called on logout: the local copy holds other people's names
+  static Future<void> clearLocal() async {
+    _cache.clear();
+    try {
+      await ReviewsDb.clear();
+    } catch (e) {
+      debugPrint('Could not clear local reviews: $e');
     }
   }
 
