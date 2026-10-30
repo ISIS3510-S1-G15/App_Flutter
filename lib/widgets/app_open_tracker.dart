@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/app_usage_analytics.dart';
+import '../services/place_selection_analytics.dart';
 
 // Wraps the main app (only shown to logged-in users) and records every time the user opens it.
 // "Open" = entering the app after logging in / restoring the session, or coming back from the
@@ -22,7 +23,7 @@ class _AppOpenTrackerState extends State<AppOpenTracker> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    AppUsageAnalytics.logAppOpen(); // first open of this session
+    _registerOpen(); // first open of this session
   }
 
   @override
@@ -38,8 +39,15 @@ class _AppOpenTrackerState extends State<AppOpenTracker> with WidgetsBindingObse
     } else if (state == AppLifecycleState.resumed && _wentToBackgroundAt != null) {
       final away = DateTime.now().difference(_wentToBackgroundAt!);
       _wentToBackgroundAt = null;
-      if (away >= _minimumAway) AppUsageAnalytics.logAppOpen();
+      if (away >= _minimumAway) _registerOpen();
     }
+  }
+
+  // I notify both BQs from here (the widget that detects the open) instead of chaining them inside
+  // AppUsageAnalytics, so the two BQs share the same "open" definition without depending on each other
+  void _registerOpen() {
+    AppUsageAnalytics.logAppOpen();
+    PlaceSelectionAnalytics.markAppOpen();
   }
 
   @override

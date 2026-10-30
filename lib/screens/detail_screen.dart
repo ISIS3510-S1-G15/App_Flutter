@@ -8,6 +8,7 @@ import '../widgets/occupancy_survey.dart';
 import '../services/occupancy_service.dart';
 import '../services/review_service.dart';
 import '../services/occupancy_check_analytics.dart';
+import '../services/place_selection_analytics.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'reviews_list_screen.dart';
 import 'write_review_screen.dart';
@@ -95,6 +96,7 @@ class _DetailScreenState extends State<DetailScreen> {
     // Tapping "Get directions" is the user's decision to go (BQ: did they check the occupancy first?)
     final r = widget.restaurant;
     OccupancyCheckAnalytics.logGoDecision(r.id);
+    PlaceSelectionAnalytics.logSelection(r.id); // BQ Type 2: time from opening the app to choosing a place
     final url = Uri.parse(
         'https://www.google.com/maps/dir/?api=1&destination=${r.latitude},${r.longitude}&travelmode=walking');
     var opened = false;
