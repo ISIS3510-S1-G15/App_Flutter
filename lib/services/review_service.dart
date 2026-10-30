@@ -66,12 +66,17 @@ class ReviewService {
   // Strategy: LRU memory cache (slides 17) with an expiration policy (slides 15), on top of SQLite
   static final ReviewsMemoryCache _memory = ReviewsMemoryCache();
 
+  // false until /reviews/summary answers once: lets RatingText tell "no reviews" from "not loaded (offline)"
+  static bool _summariesLoaded = false;
+  static bool get summariesLoaded => _summariesLoaded;
+
   static RatingSummary summaryOf(String restaurantId) => summaries.value[restaurantId] ?? RatingSummary.empty;
 
   // Called when the main app opens. If it fails, the ratings show "New" until the next successful load
   static Future<void> loadSummaries() async {
     try {
       final data = await _api.getJson('/reviews/summary') as List;
+      _summariesLoaded = true; // before the assignment, so RatingText already sees it when it redraws
       summaries.value = {
         for (final item in data.cast<Map<String, dynamic>>())
           item['restaurant_id'] as String: RatingSummary.fromJson(item),
@@ -139,6 +144,9 @@ class ReviewService {
   // Called on logout: the local copy holds other people's names
   static Future<void> clearLocal() async {
     _memory.clear();
+    // The next user must not see the ratings loaded in this session
+    _summariesLoaded = false;
+    summaries.value = const {};
     try {
       await ReviewsDb.clear();
     } catch (e) {

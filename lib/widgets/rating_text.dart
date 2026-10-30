@@ -17,7 +17,12 @@ class RatingText extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Map<String, RatingSummary>>(
       valueListenable: ReviewService.summaries,
-      builder: (context, _, __) {
+      builder: (context, summaries, _) {
+        // "New" = loaded and the place has no reviews; "—" = not loaded yet (offline), we don't know.
+        // Generic fallback (slides 15) instead of showing false information
+        if (!ReviewService.summariesLoaded && !summaries.containsKey(restaurantId)) {
+          return Text(showCount ? '' : '—', style: style);
+        }
         final summary = ReviewService.summaryOf(restaurantId);
         return Text(showCount ? '(${summary.count})' : summary.label, style: style);
       },

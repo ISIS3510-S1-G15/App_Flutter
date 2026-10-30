@@ -6,6 +6,7 @@ import '../models/survey_answers.dart';
 import '../services/auth_service.dart';
 import '../services/saved_service.dart';
 import '../services/review_service.dart';
+import '../services/connectivity_service.dart';
 import '../widgets/app_open_tracker.dart';
 import 'login_screen.dart';
 import 'survey_screen.dart';
@@ -59,6 +60,14 @@ class _AuthGateState extends State<AuthGate> {
     }
     return user;
   });
+
+  @override
+  void initState() {
+    super.initState();
+    // The login screen also needs to know if there is internet. start() ignores a second call,
+    // so MainNavigation keeps calling it safely
+    ConnectivityService.start();
+  }
 
   @override
   Widget build(BuildContext context) {
