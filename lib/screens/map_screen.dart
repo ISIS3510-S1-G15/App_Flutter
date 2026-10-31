@@ -38,6 +38,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   String? _locationError;
   LocationFix _locationFix = LocationFix.retry;
   bool _locating = true;
+  // True after the user taps "Open settings": the location is read again only when they come back from Settings.
+  // Re-reading on every resume caused a loop, because the permission dialog itself pauses and resumes the app
+  bool _openedSettings = false;
   StreamSubscription<Position>? _positionSub; // Live GPS updates while the screen is open
 
   // Current time, refreshed every minute so the meal context (breakfast, lunch...) stays up to date
@@ -53,6 +56,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _selectSpot(Restaurant? r) {
     setState(() => _selected = r);
     if (r != null && _mapReady) _mapController.move(LatLng(r.latitude, r.longitude), 18);
+  }
+
+  void _openSettings() {
+    _openedSettings = true;
+    LocationService.openSettingsFor(_locationFix);
   }
 
   // Centers the map on the user when they are on campus (off campus the campus view is more useful)
@@ -74,7 +82,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _position == null && !_locating) _loadLocation();
+    if (state == AppLifecycleState.resumed && _openedSettings && !_locating) {
+      _openedSettings = false;
+      _loadLocation();
+    }
   }
 
   @override
@@ -178,7 +189,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         icon: Icons.location_off,
         text: _locationError ?? 'Location unavailable',
         actionLabel: _locationFix == LocationFix.retry ? 'Retry' : 'Open settings',
-        onAction: _locationFix == LocationFix.retry ? _loadLocation : () => LocationService.openSettingsFor(_locationFix),
+        onAction: _locationFix == LocationFix.retry ? _loadLocation : _openSettings,
       );
     }
     if (!LocationService.isOnCampus(_position!)) {
