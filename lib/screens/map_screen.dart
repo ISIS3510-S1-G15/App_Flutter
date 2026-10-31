@@ -205,15 +205,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     final best = ranked.first;
     final bestLevel = OccupancyService.statusOf(best.id).level;
-    final alternative = _isBusy(best) ? ranked.skip(1).where((r) => !_isBusy(r)).firstOrNull : null;
+    final alternative = _isBusy(best) ? _alternativeTo(best, ranked, open) : null;
     _logRecommendation(best, bestLevel, alternative);
 
     final prefix = fitting.isNotEmpty ? '${meal!.label} time · ' : '';
 
     if (alternative != null) {
-      final match = personalized
-          ? ' · ${_matches[alternative.id]!.percent}% match'
-          : '';
+      final altMatch = _matches[alternative.id]; // the alternative may come from outside the candidates
+      final match = personalized && altMatch != null ? ' · ${altMatch.percent}% match' : '';
       return _LocationBanner(
         icon: Icons.swap_horiz,
         text: '$prefix${best.name} is busy right now · Try ${alternative.name} instead$match · ${_distanceLabel(alternative)}',
@@ -242,6 +241,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       actionLabel: 'Show',
       onAction: () => _selectSpot(best),
     );
+  }
+
+  // First choice: a place that is not busy and fits the meal. If there is none (e.g. at dinner only one
+  // place fits), any other open place that is not busy, best match first
+  Restaurant? _alternativeTo(Restaurant best, List<Restaurant> ranked, List<Restaurant> open) {
+    final sameMeal = ranked.where((r) => r.id != best.id && !_isBusy(r)).firstOrNull;
+    if (sameMeal != null) return sameMeal;
+    final others = open.where((r) => r.id != best.id && !_isBusy(r)).toList();
+    if (others.every((r) => _matches.containsKey(r.id))) {
+      others.sort((a, b) => _matches[b.id]!.percent.compareTo(_matches[a.id]!.percent));
+    }
+    return others.firstOrNull;
   }
 
   bool _isBusy(Restaurant r) {
