@@ -7,6 +7,7 @@ import '../utils/text_utils.dart';
 import '../widgets/app_chip.dart';
 import '../widgets/circle_button.dart';
 import '../widgets/survey_completion_banner.dart';
+import '../widgets/decision_time_card.dart';
 import 'survey_screen.dart';
 import 'auth_gate.dart';
 import '../services/auth_service.dart';
@@ -313,6 +314,12 @@ class ProfileScreen extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: SurveyCompletionBanner(callToAction: 'Keep yours up to date to get better recommendations.'),
+            ),
+
+            // Type 2 BQ answered to the user: how long they take to choose a place vs. all students
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: DecisionTimeCard(),
             ),
 
             // Actions: retake the survey
