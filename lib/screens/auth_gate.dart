@@ -41,7 +41,7 @@ class AuthGate extends StatefulWidget {
     final navigator = Navigator.of(context, rootNavigator: true);
     await AuthService.logout();
     await SavedService.clear();
-    RecentViewsService.clearLocal();
+    await RecentViewsService.clearLocal();
     await ReviewService.clearLocal(); // the next account must not see a local copy that includes other people's names
     userProfile.value = const SurveyAnswers(); // the next person must not see this user's preferences
     navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);

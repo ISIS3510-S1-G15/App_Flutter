@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'api_client.dart';
 import 'restaurant_view_analytics.dart';
 
@@ -24,17 +28,59 @@ class RecentView {
 
 class RecentViewsService {
   static final ApiClient _api = ApiClient();
+  static const _fileName = 'recent_views.json';
 
   static final ValueNotifier<List<RecentView>> items = ValueNotifier(const []);
   static final ValueNotifier<DateTime?> updatedAt = ValueNotifier(null);
 
+  static Future<void>? _loadingFile;
+
+  static Future<File> _file() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File(join(dir.path, _fileName));
+  }
+
+  static Future<void> _ensureFileLoaded() => _loadingFile ??= _readFile();
+
+  static Future<void> _readFile() async {
+    try {
+      final file = await _file();
+      if (!await file.exists()) return;
+      final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      items.value = (data['items'] as List)
+          .map((e) => RecentView.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(growable: false);
+      final stored = data['updated_at'] as String?;
+      updatedAt.value = stored == null ? null : DateTime.tryParse(stored)?.toLocal();
+    } catch (e) {
+      debugPrint('Could not read the recent views file: $e');
+    }
+  }
+
+  static Future<void> _writeFile() async {
+    try {
+      final file = await _file();
+      final raw = jsonEncode({
+        'updated_at': updatedAt.value?.toUtc().toIso8601String(),
+        'items': items.value.map((v) => v.toJson()).toList(),
+      });
+      final temp = File('${file.path}.tmp');
+      await temp.writeAsString(raw, flush: true);
+      await temp.rename(file.path);
+    } catch (e) {
+      debugPrint('Could not write the recent views file: $e');
+    }
+  }
+
   static Future<void> load() async {
+    await _ensureFileLoaded();
     try {
       final data = await _api.getJson('/me/recent-views') as Map<String, dynamic>;
       _applyServerList(data);
       updatedAt.value = DateTime.now();
+      await _writeFile();
     } catch (e) {
-      debugPrint('Could not load recent views from the backend: $e');
+      debugPrint('Could not load recent views from the backend, using the saved file: $e');
     }
   }
 
@@ -45,6 +91,7 @@ class RecentViewsService {
   }
 
   static Future<void> recordView(String restaurantId) async {
+    await _ensureFileLoaded();
     final now = DateTime.now().toUtc();
     final previous = items.value.where((v) => v.restaurantId == restaurantId);
     final count = previous.isEmpty ? 0 : previous.first.viewCount;
@@ -52,15 +99,18 @@ class RecentViewsService {
       RecentView(restaurantId: restaurantId, viewCount: count + 1, lastViewedAt: now),
       ...items.value.where((v) => v.restaurantId != restaurantId),
     ];
+    await _writeFile();
     await RestaurantViewAnalytics.logView(restaurantId);
   }
 
   static Future<bool> remove(String restaurantId) async {
+    await _ensureFileLoaded();
     items.value = items.value.where((v) => v.restaurantId != restaurantId).toList(growable: false);
     return _changeOnServer(() => _api.deleteJson('/me/recent-views/$restaurantId'));
   }
 
   static Future<bool> clearHistory() async {
+    await _ensureFileLoaded();
     items.value = const [];
     return _changeOnServer(() => _api.deleteJson('/me/recent-views'));
   }
@@ -69,6 +119,7 @@ class RecentViewsService {
     try {
       _applyServerList(await request() as Map<String, dynamic>);
       updatedAt.value = DateTime.now();
+      await _writeFile();
       return true;
     } catch (e) {
       debugPrint('Could not update recent views: $e');
@@ -77,8 +128,15 @@ class RecentViewsService {
     }
   }
 
-  static void clearLocal() {
+  static Future<void> clearLocal() async {
     items.value = const [];
     updatedAt.value = null;
+    _loadingFile = Future.value();
+    try {
+      final file = await _file();
+      if (await file.exists()) await file.delete();
+    } catch (e) {
+      debugPrint('Could not delete the recent views file: $e');
+    }
   }
 }
