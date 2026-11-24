@@ -12,6 +12,7 @@ import 'services/restaurant_service.dart';
 import 'services/profile_service.dart';
 import 'services/pending_events.dart';
 import 'services/connectivity_service.dart';
+import 'services/recent_views_service.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -53,6 +54,7 @@ class _MainNavigationState extends State<MainNavigation> {
     ReviewService.loadSummaries(); // rating and number of reviews of every restaurant
     OccupancyService.loadAll(source: OccupancyRefreshSource.appOpen); // crowding level of every restaurant (badges)
     PendingEvents.sendAll();
+    RecentViewsService.load();
     ConnectivityService.start();
   }
 

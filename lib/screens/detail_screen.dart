@@ -13,7 +13,7 @@ import 'directions_screen.dart';
 import 'reviews_list_screen.dart';
 import 'write_review_screen.dart';
 import '../services/saved_service.dart';
-import '../services/restaurant_view_analytics.dart';
+import '../services/recent_views_service.dart';
 
 class DetailScreen extends StatefulWidget {
   final Restaurant restaurant;
@@ -38,7 +38,7 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   void initState() {
     super.initState();
-    RestaurantViewAnalytics.logView(widget.restaurant.id); // BQ Type 3: every time the detail is opened
+    RecentViewsService.recordView(widget.restaurant.id); // BQ Type 3: every time the detail is opened
     _refreshOccupancy(OccupancyRefreshSource.detailOpen);
     _pollTimer = Timer.periodic(_pollEvery, (_) => _refreshOccupancy(OccupancyRefreshSource.detailPoll));
     // The screen redraws when any of the data it shows changes (bookmark, crowding, rating)
