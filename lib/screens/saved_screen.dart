@@ -5,6 +5,8 @@ import '../models/restaurant.dart';
 import '../widgets/crowding_badge.dart';
 import '../widgets/rating_text.dart';
 import '../services/saved_service.dart';
+import '../services/recent_views_service.dart';
+import 'recently_viewed_screen.dart';
 import '../widgets/offline_banner.dart';
 import 'detail_screen.dart';
 import '../data/profile_data.dart';
@@ -29,7 +31,10 @@ class SavedScreen extends StatelessWidget {
       valueListenable: RestaurantService.restaurants,
       builder: (context, _, __) => ValueListenableBuilder<Set<String>>(
         valueListenable: SavedService.savedIds,
-        builder: (context, savedIds, _) => _buildContent(context, savedIds),
+        builder: (context, savedIds, _) => ValueListenableBuilder<List<RecentView>>(
+          valueListenable: RecentViewsService.items,
+          builder: (context, _, _) => _buildContent(context, savedIds),
+        ),
       ),
     );
   }
@@ -38,7 +43,12 @@ class SavedScreen extends StatelessWidget {
     // Filters the full restaurant list into three groups used across this screen
     final saved = RestaurantService.restaurants.value.where((r) => savedIds.contains(r.id)).toList();
     final openNow = RestaurantService.restaurants.value.where((r) => r.isOpenNow).take(3).toList();
-    final recentlyViewed = RestaurantService.restaurants.value.where((r) => !savedIds.contains(r.id)).take(4).toList();
+    final byId = {for (final r in RestaurantService.restaurants.value) r.id: r};
+    final recentlyViewed = RecentViewsService.items.value
+        .map((v) => byId[v.restaurantId])
+        .whereType<Restaurant>()
+        .take(4)
+        .toList();
     final dietaryPreferences = userProfile.value.dietaryRestrictions.where((d) => d != 'None').toList();
 
     return Scaffold(
@@ -210,8 +220,25 @@ class SavedScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // ---------- Recently Viewed (horizontal scroll of non-saved places) ----------
-            Text('Recently Viewed', style: AppTextStyles.cardTitle.copyWith(fontSize: 15)),
-            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Recently Viewed', style: AppTextStyles.cardTitle.copyWith(fontSize: 15)),
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const RecentlyViewedScreen()),
+                  ),
+                  child: Text('See all', style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.accent)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            if (recentlyViewed.isEmpty)
+              Text(
+                'The places you open will appear here.',
+                style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.closed),
+              )
+            else
             SizedBox(
               height: 130,
               child: ListView.separated(
