@@ -14,6 +14,7 @@ import '../services/preference_match.dart';
 import '../services/occupancy_service.dart';
 import '../services/recommendation_analytics.dart';
 import '../data/profile_data.dart';
+import '../utils/coalescing_runner.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -31,7 +32,21 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   Restaurant? _selected;
   String? _loggedRecommendation;
   Map<String, PreferenceMatch> _matches = const {};
-  int _matchesRun = 0;
+
+  // MULTITHREADING: match scores are computed in a background isolate, one run at a time.
+  // Requests that arrive while it runs (GPS, profile, restaurant list) collapse into one re-run.
+  late final CoalescingRunner<Map<String, PreferenceMatch>> _matcher = CoalescingRunner(
+    _scoreMatches,
+    onResult: _applyMatches,
+    onError: (e, _) {
+      debugPrint('Could not compute matches, keeping the previous ones: $e');
+      if (mounted) setState(() {}); // hides "Calculating…"
+    },
+  );
+  // Position used in the last scoring. Matches are re-scored only after walking _rescoreMeters,
+  // not on every GPS update (one isolate per 10 m step was wasted work)
+  Position? _scoredAt;
+  static const _rescoreMeters = 50.0;
 
   // GPS state: the user's position (null until it is read), why it is unavailable, and if it is still loading
   Position? _position;
@@ -128,26 +143,40 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _positionSub = LocationService.positionStream().listen(
         (p) {
           if (!mounted) return;
-          setState(() => _position = p);
-          _refreshMatches();
+          setState(() => _position = p); // distance labels follow every update (cheap)
+          if (_movedEnoughToRescore(p)) _refreshMatches(); // match scores only every 50 m (isolate)
         },
         onError: (_) {}, // Keeps the last known position if an update fails
       );
     }
   }
 
-  Future<void> _refreshMatches() async {
-    final profile = userProfile.value;
-    final run = ++_matchesRun;
-    if (!PreferenceMatcher.hasPreferences(profile)) {
+  // Asks for new match scores. If a scoring is already running, it is not discarded:
+  // the runner re-scores once more with the newest data when it finishes
+  void _refreshMatches() {
+    if (!PreferenceMatcher.hasPreferences(userProfile.value)) {
       if (_matches.isNotEmpty) setState(() => _matches = const {});
       return;
     }
-    final distances = {for (final r in RestaurantService.restaurants.value) r.id: _distanceTo(r)};
-    final result = await PreferenceMatcher.scoreAllInBackground(RestaurantService.restaurants.value, profile, distances);
-    if (!mounted || run != _matchesRun) return;
-    setState(() => _matches = result);
+    _matcher.request();
   }
+
+  // The job that runs in the background. Reads the data when it starts, so a re-run always uses the latest
+  Future<Map<String, PreferenceMatch>> _scoreMatches() {
+    final restaurants = RestaurantService.restaurants.value;
+    _scoredAt = _position;
+    final distances = {for (final r in restaurants) r.id: _distanceTo(r)};
+    return PreferenceMatcher.scoreAllInBackground(restaurants, userProfile.value, distances);
+  }
+
+  void _applyMatches(Map<String, PreferenceMatch> result) {
+    if (!mounted) return;
+    // The profile may have been cleared while the isolate was running
+    setState(() => _matches = PreferenceMatcher.hasPreferences(userProfile.value) ? result : const {});
+  }
+
+  bool _movedEnoughToRescore(Position p) =>
+      _scoredAt == null || LocationService.distanceTo(_scoredAt!, p.latitude, p.longitude) >= _rescoreMeters;
 
   double? _distanceTo(Restaurant r) =>
       _position == null ? null : LocationService.distanceTo(_position!, r.latitude, r.longitude);
@@ -174,7 +203,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   String? _matchLabel(Restaurant r) {
     final match = _matches[r.id];
-    if (match == null) return null;
+    if (match == null) return _matcher.isRunning ? 'Calculating your match…' : null;
     final warning = match.warnings.isEmpty ? '' : ' · ${match.warnings.first}';
     return '${match.percent}% match for you$warning';
   }
