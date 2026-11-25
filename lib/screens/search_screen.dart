@@ -12,6 +12,7 @@ import '../services/search_analytics.dart'; // logs searches with no results to 
 import '../utils/search_filter.dart';
 import '../utils/lru_cache.dart';
 import '../services/pending_events.dart';
+import '../widgets/restaurant_image.dart';
 
 // Fixed lists of sample data (not yet sourced from an actual database)
 const _recentNames = ['Starbucks', 'Kai Sushi', 'Cosechas'];
@@ -457,17 +458,7 @@ class _SearchResultRow extends StatelessWidget {
             // Photo of the restaurant (or a gray box if the image doesn't exist or fails to load)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                r.image,
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 60,
-                  height: 60,
-                  color: AppColors.closed.withOpacity(0.3),
-                ),
-              ),
+              child: RestaurantImage(r, width: 60, height: 60),
             ),
             const SizedBox(width: 12),
 

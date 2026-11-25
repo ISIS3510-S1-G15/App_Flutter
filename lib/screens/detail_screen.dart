@@ -14,6 +14,7 @@ import 'reviews_list_screen.dart';
 import 'write_review_screen.dart';
 import '../services/saved_service.dart';
 import '../services/recent_views_service.dart';
+import '../widgets/restaurant_image.dart';
 
 class DetailScreen extends StatefulWidget {
   final Restaurant restaurant;
@@ -128,11 +129,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.asset(
-                      r.image,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: AppColors.closed.withOpacity(0.3)),
-                    ),
+                    RestaurantImage(r),
                     // Dark gradient so the top buttons and bottom chips stay legible
                     DecoratedBox(
                       decoration: BoxDecoration(

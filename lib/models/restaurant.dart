@@ -5,7 +5,8 @@ class Restaurant {
   final String name;
   final String location;
   final String category;
-  final String image;
+  final String image; // bundled picture (asset path), used when the backend sends an image_key
+  final String? imageUrl; // picture hosted online, sent by the backend as image_url (takes priority)
   final bool isOpen;
   final double rating;
   final int reviews;
@@ -31,6 +32,7 @@ class Restaurant {
     required this.location,
     required this.category,
     required this.image,
+    this.imageUrl,
     required this.isOpen,
     required this.rating,
     required this.reviews,
@@ -54,6 +56,7 @@ class Restaurant {
         location: json['location'] as String? ?? '',
         category: json['category'] as String? ?? '',
         image: _imageAsset(json['image_key'] as String?),
+        imageUrl: _nonEmpty(json['image_url'] as String?),
         isOpen: true, // the real open/closed state comes from "hours" (see isOpenAt)
         rating: (json['rating'] as num?)?.toDouble() ?? 0,
         reviews: json['review_count'] as int? ?? 0,
@@ -79,6 +82,8 @@ class Restaurant {
     'sushi': 'sushi.png',
     'la_puerta': 'la_puerta.png',
   };
+
+  static String? _nonEmpty(String? s) => (s == null || s.trim().isEmpty) ? null : s.trim();
 
   static String _imageAsset(String? key) {
     if (key == null || key.isEmpty) return 'web/icons/placeholder.png';

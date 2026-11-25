@@ -19,6 +19,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'detail_screen.dart';
+import '../widgets/restaurant_image.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -566,17 +567,7 @@ class _SelectedCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: Image.asset(
-                r.image,
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 60,
-                  height: 60,
-                  color: AppColors.closed.withOpacity(0.3),
-                ),
-              ),
+              child: RestaurantImage(r, width: 60, height: 60),
             ),
             const SizedBox(width: 12),
             Expanded(
