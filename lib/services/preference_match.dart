@@ -1,4 +1,6 @@
+import 'dart:developer';
 import 'dart:isolate';
+import 'package:flutter/foundation.dart';
 import '../models/restaurant.dart';
 import '../models/survey_answers.dart';
 
@@ -110,12 +112,25 @@ class PreferenceMatcher {
   ) =>
       {for (final r in list) r.id: score(r, p, distanceMeters: distances[r.id])};
 
+  // MULTITHREADING: scoring parses every menu and price, so it runs in a background Isolate to keep
+  // the UI thread free for drawing the map. If the isolate fails, it falls back to the main thread
+  // so the user still gets their match instead of an empty screen.
+  // The TimelineTask shows each run as "PreferenceMatcher.scoreAll" in DevTools (Performance tab).
   static Future<Map<String, PreferenceMatch>> scoreAllInBackground(
     List<Restaurant> list,
     SurveyAnswers p,
     Map<String, double?> distances,
-  ) =>
-      Isolate.run(() => scoreAll(list, p, distances));
+  ) async {
+    final task = TimelineTask()..start('PreferenceMatcher.scoreAll', arguments: {'restaurants': list.length});
+    try {
+      return await Isolate.run(() => scoreAll(list, p, distances));
+    } catch (e) {
+      debugPrint('Match isolate failed, scoring on the main thread: $e');
+      return scoreAll(list, p, distances);
+    } finally {
+      task.finish();
+    }
+  }
 
   static List<Restaurant> rank(List<Restaurant> list, SurveyAnswers p, double? Function(Restaurant) distance) {
     final scores = {for (final r in list) r.id: score(r, p, distanceMeters: distance(r)).percent};
