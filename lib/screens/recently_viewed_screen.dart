@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/back_header.dart';
 import '../widgets/circle_button.dart';
 import 'detail_screen.dart';
+import '../widgets/restaurant_image.dart';
 
 class RecentlyViewedScreen extends StatefulWidget {
   const RecentlyViewedScreen({super.key});
@@ -232,13 +233,7 @@ class _RecentRow extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                restaurant.image,
-                width: 64,
-                height: 64,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(width: 64, height: 64, color: AppColors.border),
-              ),
+              child: RestaurantImage(restaurant, width: 64, height: 64, placeholderColor: AppColors.border),
             ),
             const SizedBox(width: 12),
             Expanded(

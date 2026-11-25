@@ -10,6 +10,7 @@ import 'recently_viewed_screen.dart';
 import '../widgets/offline_banner.dart';
 import 'detail_screen.dart';
 import '../data/profile_data.dart';
+import '../widgets/restaurant_image.dart';
 
 
 class SavedScreen extends StatelessWidget {
@@ -264,16 +265,7 @@ class SavedScreen extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                                child: Image.asset(
-                                  r.image,
-                                  height: 80,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    height: 80,
-                                    color: AppColors.closed.withOpacity(0.3),
-                                  ),
-                                ),
+                                child: RestaurantImage(r, width: double.infinity, height: 80),
                               ),
                               // Small "Open"/"Closed" tag over the photo
                               Positioned(
@@ -364,16 +356,7 @@ class _SavedCard extends StatelessWidget {
                 // Full-width photo at the top of the card
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: Image.asset(
-                    r.image,
-                    height: 130,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 130,
-                      color: AppColors.closed.withOpacity(0.3),
-                    ),
-                  ),
+                  child: RestaurantImage(r, width: double.infinity, height: 130),
                 ),
                 // Name + rating overlaid at the bottom of the photo
                 Positioned(

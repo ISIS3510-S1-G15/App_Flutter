@@ -13,6 +13,7 @@ import '../services/filter_analytics.dart';
 import 'detail_screen.dart';
 import 'profile_screen.dart';
 import '../services/saved_service.dart';
+import '../widgets/restaurant_image.dart';
 
 // Category pills shown under "Today's Pick". 'All' shows every restaurant
 const _categories = ['All', 'Dining Hall', 'Café', 'Asian', 'Burgers', 'Indian', 'Smoothies'];
@@ -279,11 +280,7 @@ class _FeaturedCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset(
-                r.image,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(color: AppColors.closed.withOpacity(0.3)),
-              ),
+              RestaurantImage(r),
               // Dark gradient from the bottom so the white text stays legible over the photo
               DecoratedBox(
                 decoration: BoxDecoration(
@@ -395,11 +392,7 @@ class _RestaurantCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.asset(
-                      r.image,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: AppColors.closed.withOpacity(0.3)),
-                    ),
+                    RestaurantImage(r),
                     if (SavedService.isSaved(r.id))
                       Positioned(
                         top: 8,
