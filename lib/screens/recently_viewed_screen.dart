@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/restaurant.dart';
+import '../services/history_worker.dart';
 import '../services/recent_views_service.dart';
 import '../services/restaurant_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/history_grouping.dart';
 import '../widgets/back_header.dart';
 import '../widgets/circle_button.dart';
 import 'detail_screen.dart';
@@ -17,6 +17,7 @@ class RecentlyViewedScreen extends StatefulWidget {
 
 class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
   List<Map<String, dynamic>> _sections = const [];
+  int _groupId = 0;
 
   @override
   void initState() {
@@ -38,12 +39,13 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
     if (mounted) setState(() {});
   }
 
-  void _regroup() {
-    final sections = groupByDay(
+  Future<void> _regroup() async {
+    final id = ++_groupId;
+    final sections = await HistoryWorker.group(
       RecentViewsService.items.value.map((v) => v.toJson()).toList(),
       DateTime.now(),
     );
-    if (!mounted) return;
+    if (!mounted || id != _groupId) return;
     setState(() => _sections = sections);
   }
 
