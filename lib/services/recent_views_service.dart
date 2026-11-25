@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'api_client.dart';
+import 'history_worker.dart';
 import 'restaurant_view_analytics.dart';
 
 class RecentView {
@@ -46,7 +46,7 @@ class RecentViewsService {
     try {
       final file = await _file();
       if (!await file.exists()) return;
-      final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final data = await HistoryWorker.decode(await file.readAsString());
       items.value = (data['items'] as List)
           .map((e) => RecentView.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(growable: false);
@@ -60,7 +60,7 @@ class RecentViewsService {
   static Future<void> _writeFile() async {
     try {
       final file = await _file();
-      final raw = jsonEncode({
+      final raw = await HistoryWorker.encode({
         'updated_at': updatedAt.value?.toUtc().toIso8601String(),
         'items': items.value.map((v) => v.toJson()).toList(),
       });
