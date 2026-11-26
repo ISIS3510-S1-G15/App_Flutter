@@ -10,6 +10,7 @@ import '../widgets/app_text_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/stars.dart';
 import '../widgets/success_check.dart';
+import 'my_reviews_screen.dart';
 
 // Special diets the reviewer can say the restaurant accommodates
 const _dietaryOptions = ['Vegan options', 'Vegetarian options', 'Gluten-free', 'Lactose-free', 'Nut-free', 'Halal', 'Kosher'];
@@ -305,6 +306,37 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                   shadow: false,
                   // Closes this screen and returns to wherever it was opened from (restaurant detail or reviews list)
                   onTap: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(height: 12),
+
+                // Secondary action: see the review just written among all of the user's reviews (a queued one shows
+                // there as "Pending sync"). pushReplacement so "back" from My Reviews returns to the restaurant,
+                // not to this thanks screen
+                InkWell(
+                  onTap: () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const MyReviewsScreen()),
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    height: 48,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.rate_review_outlined, size: 16, color: AppColors.dark),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Go to My Reviews',
+                          style: AppTextStyles.body.copyWith(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
