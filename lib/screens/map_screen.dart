@@ -15,6 +15,8 @@ import '../services/occupancy_service.dart';
 import '../services/recommendation_analytics.dart';
 import '../data/profile_data.dart';
 import '../utils/coalescing_runner.dart';
+import '../services/connectivity_service.dart';
+import '../widgets/offline_banner.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -209,6 +211,53 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return '${match.percent}% match for you$warning';
   }
 
+  // EVENTUAL CONNECTIVITY (Map): what still works offline, said for this screen, not a generic message.
+  // Places come from the list saved on the phone (with its age), distances and match scores are
+  // computed on the phone (GPS + isolate), and map areas seen before come from the tile cache.
+  // When the connection comes back, RestaurantService downloads the newest list by itself
+  Widget _buildOfflineNotice() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ConnectivityService.isOnline,
+      builder: (context, online, _) {
+        if (online || RestaurantService.restaurants.value.isEmpty) return const SizedBox.shrink();
+        final updated = RestaurantService.updatedAt.value;
+        final age = updated == null ? '' : ' from ${RestaurantService.ago(updated)}';
+        return OfflineBanner(
+          margin: const EdgeInsets.only(bottom: 12),
+          message: "You're offline. Showing saved places$age. Distances and your match are calculated on "
+              'your phone, and map areas you already visited still show.',
+        );
+      },
+    );
+  }
+
+  // Empty list: offline with nothing saved yet (first use without internet), still loading, or no open place
+  Widget _buildEmptyList() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ConnectivityService.isOnline,
+      builder: (context, online, _) {
+        final noData = RestaurantService.restaurants.value.isEmpty;
+        final (icon, text) = switch ((noData, online)) {
+          (true, false) => (Icons.wifi_off, 'No connection and no saved places yet. Connect once to load the campus '
+              'places; after that they will also show offline.'),
+          (true, true) => (Icons.hourglass_empty, 'Loading campus places…'),
+          _ => (Icons.storefront, 'No places are open right now. Tap "All Spots" to see every place.'),
+        };
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: AppColors.card, borderRadius: BorderRadius.circular(14)),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.muted),
+              const SizedBox(width: 12),
+              Expanded(child: Text(text, style: AppTextStyles.body.copyWith(fontSize: 13, color: AppColors.muted))),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // Message above the list that adapts to the user's context: locating, no permission, off campus, or the closest open spot
   Widget _buildLocationBanner() {
     if (_locating) {
@@ -229,6 +278,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         text: "You're ${LocationService.formatDistance(d)} away from campus",
       );
     }
+    // No list yet (offline on first use, or still loading): the empty-list card below explains it
+    if (RestaurantService.restaurants.value.isEmpty) return const SizedBox.shrink();
     final open = RestaurantService.restaurants.value.where((r) => r.isOpenNow).toList()
       ..sort((a, b) => _distanceTo(a)!.compareTo(_distanceTo(b)!));
     if (open.isEmpty) {
@@ -492,6 +543,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 children: [
+                  _buildOfflineNotice(),
                   ValueListenableBuilder(
                     valueListenable: OccupancyService.statuses,
                     builder: (context, _, _) => _buildLocationBanner(),
@@ -502,6 +554,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
                   ),
                   const SizedBox(height: 12),
+                  if (visible.isEmpty) _buildEmptyList(),
                   ...visible.map((r) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _QuickListItem(
