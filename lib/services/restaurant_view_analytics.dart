@@ -9,11 +9,16 @@ class RestaurantViewAnalytics {
   static final ApiClient _api = ApiClient(); // Singleton: already carries the user's session token
 
   // Fails silently: analytics must never block or interrupt the user
-  static Future<void> logView(String restaurantId) async {
+  static Future<bool> logView(String restaurantId, {DateTime? viewedAt}) async {
     try {
-      await _api.postJson('/analytics/restaurant-view', {'restaurant_id': restaurantId});
+      await _api.postJson('/analytics/restaurant-view', {
+        'restaurant_id': restaurantId,
+        if (viewedAt != null) 'viewed_at': viewedAt.toUtc().toIso8601String(),
+      });
+      return true;
     } catch (e) {
       debugPrint('Could not log restaurant view: $e');
+      return false;
     }
   }
 }

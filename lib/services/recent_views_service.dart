@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'api_client.dart';
+import 'connectivity_service.dart';
 import 'history_worker.dart';
 import 'restaurant_view_analytics.dart';
 
@@ -32,8 +33,11 @@ class RecentViewsService {
 
   static final ValueNotifier<List<RecentView>> items = ValueNotifier(const []);
   static final ValueNotifier<DateTime?> updatedAt = ValueNotifier(null);
+  static final ValueNotifier<int> pendingChanges = ValueNotifier(0);
 
   static Future<void>? _loadingFile;
+  static List<Map<String, dynamic>> _pending = [];
+  static bool _syncing = false;
 
   static const freshFor = Duration(minutes: 2);
   static DateTime? _lastFetch;
@@ -56,6 +60,8 @@ class RecentViewsService {
           .toList(growable: false);
       final stored = data['updated_at'] as String?;
       updatedAt.value = stored == null ? null : DateTime.tryParse(stored)?.toLocal();
+      _pending = ((data['pending'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      pendingChanges.value = _pending.length;
     } catch (e) {
       debugPrint('Could not read the recent views file: $e');
     }
@@ -67,6 +73,7 @@ class RecentViewsService {
       final raw = await HistoryWorker.encode({
         'updated_at': updatedAt.value?.toUtc().toIso8601String(),
         'items': items.value.map((v) => v.toJson()).toList(),
+        'pending': _pending,
       });
       final temp = File('${file.path}.tmp');
       await temp.writeAsString(raw, flush: true);
@@ -83,7 +90,7 @@ class RecentViewsService {
 
   static Future<void> load({bool force = false}) async {
     await _ensureFileLoaded();
-    if (!force && _isFresh) {
+    if (!force && _pending.isEmpty && _isFresh) {
       debugPrint('Recent views cache hit: fetched ${DateTime.now().difference(_lastFetch!).inSeconds}s ago, no request sent');
       return;
     }
@@ -91,6 +98,7 @@ class RecentViewsService {
   }
 
   static Future<void> _fetch() async {
+    if (!await _sendPending()) return;
     debugPrint('Recent views cache miss: asking the backend');
     try {
       final data = await _api.getJson('/me/recent-views') as Map<String, dynamic>;
@@ -118,39 +126,89 @@ class RecentViewsService {
       RecentView(restaurantId: restaurantId, viewCount: count + 1, lastViewedAt: now),
       ...items.value.where((v) => v.restaurantId != restaurantId),
     ];
-    await _writeFile();
-    await RestaurantViewAnalytics.logView(restaurantId);
+    if (_pending.isEmpty && ConnectivityService.isOnline.value) {
+      if (await RestaurantViewAnalytics.logView(restaurantId, viewedAt: now)) {
+        await _writeFile();
+        return;
+      }
+    }
+    await _queue({'action': 'view', 'restaurant_id': restaurantId, 'viewed_at': now.toIso8601String()});
   }
 
   static Future<bool> remove(String restaurantId) async {
     await _ensureFileLoaded();
     items.value = items.value.where((v) => v.restaurantId != restaurantId).toList(growable: false);
-    return _changeOnServer(() => _api.deleteJson('/me/recent-views/$restaurantId'));
+    return _changeOnServer({'action': 'remove', 'restaurant_id': restaurantId});
   }
 
   static Future<bool> clearHistory() async {
     await _ensureFileLoaded();
     items.value = const [];
-    return _changeOnServer(() => _api.deleteJson('/me/recent-views'));
+    return _changeOnServer({'action': 'clear'});
   }
 
-  static Future<bool> _changeOnServer(Future<dynamic> Function() request) async {
+  static Future<bool> _changeOnServer(Map<String, dynamic> change) async {
+    if (_pending.isEmpty && ConnectivityService.isOnline.value) {
+      try {
+        _applyServerList(await _send(change) as Map<String, dynamic>);
+        updatedAt.value = DateTime.now();
+        _lastFetch = DateTime.now();
+        await _writeFile();
+        return true;
+      } catch (e) {
+        debugPrint('Could not update recent views, keeping the change on this phone: $e');
+      }
+    }
+    await _queue(change);
+    return false;
+  }
+
+  static Future<void> _queue(Map<String, dynamic> change) async {
+    _pending.add(change);
+    pendingChanges.value = _pending.length;
+    await _writeFile();
+  }
+
+  static Future<dynamic> _send(Map<String, dynamic> change) {
+    final id = change['restaurant_id'] as String?;
+    switch (change['action']) {
+      case 'view':
+        return _api.postJson('/analytics/restaurant-view', {'restaurant_id': id, 'viewed_at': change['viewed_at']});
+      case 'remove':
+        return _api.deleteJson('/me/recent-views/$id');
+      default:
+        return _api.deleteJson('/me/recent-views');
+    }
+  }
+
+  static Future<bool> _sendPending() async {
+    if (_syncing) return false;
+    _syncing = true;
     try {
-      _applyServerList(await request() as Map<String, dynamic>);
-      updatedAt.value = DateTime.now();
-      _lastFetch = DateTime.now();
-      await _writeFile();
+      while (_pending.isNotEmpty) {
+        try {
+          await _send(_pending.first);
+        } on ApiException catch (e) {
+          if (e.statusCode == 401 || e.statusCode >= 500) rethrow;
+        }
+        _pending.removeAt(0);
+        pendingChanges.value = _pending.length;
+        await _writeFile();
+      }
       return true;
     } catch (e) {
-      debugPrint('Could not update recent views: $e');
-      await load(force: true);
+      debugPrint('Pending recent view changes not sent yet: $e');
       return false;
+    } finally {
+      _syncing = false;
     }
   }
 
   static Future<void> clearLocal() async {
     items.value = const [];
     updatedAt.value = null;
+    _pending = [];
+    pendingChanges.value = 0;
     _lastFetch = null;
     _loadingFile = Future.value();
     try {

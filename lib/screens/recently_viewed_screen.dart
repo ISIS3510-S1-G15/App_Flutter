@@ -6,6 +6,7 @@ import '../services/restaurant_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/back_header.dart';
 import '../widgets/circle_button.dart';
+import '../widgets/offline_banner.dart';
 import 'detail_screen.dart';
 import '../widgets/restaurant_image.dart';
 
@@ -63,7 +64,7 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
     messenger.showSnackBar(SnackBar(
       content: Text(synced
           ? '${r.name} removed from your history'
-          : 'Could not remove ${r.name}. Check your connection and try again.'),
+          : '${r.name} removed on this phone. It will sync when you\'re back online.'),
     ));
   }
 
@@ -100,6 +101,10 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
               onBack: () => Navigator.of(context).pop(),
               trailing: AppCircleButton(icon: Icons.delete_outline, onTap: _confirmClear),
             ),
+            const OfflineBanner(
+              message: "You're offline. This is the history saved on this phone. Removed places will sync when you're back online.",
+              margin: EdgeInsets.fromLTRB(20, 0, 20, 8),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -110,6 +115,16 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
                       updated == null ? 'Not synced yet' : 'Updated at ${_time(updated)}',
                       style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.closed),
                     ),
+                  ),
+                  const Spacer(),
+                  ValueListenableBuilder<int>(
+                    valueListenable: RecentViewsService.pendingChanges,
+                    builder: (context, pending, _) => pending == 0
+                        ? const SizedBox.shrink()
+                        : Text(
+                            pending == 1 ? '1 change waiting to sync' : '$pending changes waiting to sync',
+                            style: AppTextStyles.body.copyWith(fontSize: 11, color: AppColors.accent),
+                          ),
                   ),
                 ],
               ),
