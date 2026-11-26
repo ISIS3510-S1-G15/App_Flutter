@@ -35,6 +35,10 @@ class RecentViewsService {
 
   static Future<void>? _loadingFile;
 
+  static const freshFor = Duration(minutes: 2);
+  static DateTime? _lastFetch;
+  static Future<void>? _fetching;
+
   static Future<File> _file() async {
     final dir = await getApplicationDocumentsDirectory();
     return File(join(dir.path, _fileName));
@@ -72,12 +76,27 @@ class RecentViewsService {
     }
   }
 
-  static Future<void> load() async {
+  static bool get _isFresh {
+    final last = _lastFetch;
+    return last != null && DateTime.now().difference(last) < freshFor;
+  }
+
+  static Future<void> load({bool force = false}) async {
     await _ensureFileLoaded();
+    if (!force && _isFresh) {
+      debugPrint('Recent views cache hit: fetched ${DateTime.now().difference(_lastFetch!).inSeconds}s ago, no request sent');
+      return;
+    }
+    await (_fetching ??= _fetch().whenComplete(() => _fetching = null));
+  }
+
+  static Future<void> _fetch() async {
+    debugPrint('Recent views cache miss: asking the backend');
     try {
       final data = await _api.getJson('/me/recent-views') as Map<String, dynamic>;
       _applyServerList(data);
       updatedAt.value = DateTime.now();
+      _lastFetch = DateTime.now();
       await _writeFile();
     } catch (e) {
       debugPrint('Could not load recent views from the backend, using the saved file: $e');
@@ -119,11 +138,12 @@ class RecentViewsService {
     try {
       _applyServerList(await request() as Map<String, dynamic>);
       updatedAt.value = DateTime.now();
+      _lastFetch = DateTime.now();
       await _writeFile();
       return true;
     } catch (e) {
       debugPrint('Could not update recent views: $e');
-      await load();
+      await load(force: true);
       return false;
     }
   }
@@ -131,6 +151,7 @@ class RecentViewsService {
   static Future<void> clearLocal() async {
     items.value = const [];
     updatedAt.value = null;
+    _lastFetch = null;
     _loadingFile = Future.value();
     try {
       final file = await _file();

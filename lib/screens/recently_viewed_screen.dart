@@ -117,7 +117,7 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
             const SizedBox(height: 8),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: RecentViewsService.load,
+                onRefresh: () => RecentViewsService.load(force: true),
                 child: _sections.isEmpty ? _empty() : _list(),
               ),
             ),
