@@ -20,7 +20,7 @@ class MyReviewCard extends StatelessWidget {
 
     // Material + InkWell so the ripple is drawn on the card's own background and clipped to its corners
     return Material(
-      color: AppColors.card,
+      color: r.pending ? AppColors.background : AppColors.card, // cream = written offline, not posted yet
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -48,7 +48,20 @@ class MyReviewCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.cardTitle.copyWith(fontSize: 15),
                         ),
-                        Text(formatDate(r.date), style: const TextStyle(fontSize: 10, color: AppColors.mutedLight)),
+                        // A queued review has no publication date yet: it says it is waiting to be sent instead
+                        if (r.pending)
+                          const Row(
+                            children: [
+                              Icon(Icons.cloud_upload_outlined, size: 12, color: AppColors.accent),
+                              SizedBox(width: 4),
+                              Text(
+                                'Pending sync',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.accent),
+                              ),
+                            ],
+                          )
+                        else
+                          Text(formatDate(r.date), style: const TextStyle(fontSize: 10, color: AppColors.mutedLight)),
                       ],
                     ),
                   ),
