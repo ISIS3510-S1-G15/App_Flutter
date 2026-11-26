@@ -20,12 +20,15 @@ class RecentlyViewedScreen extends StatefulWidget {
 class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
   List<Map<String, dynamic>> _sections = const [];
   int _groupId = 0;
+  Map<String, Restaurant> _byId = const {};
+  List<Object> _rows = const [];
 
   @override
   void initState() {
     super.initState();
     RecentViewsService.items.addListener(_regroup);
     RestaurantService.restaurants.addListener(_onCatalogChanged);
+    _indexCatalog();
     _regroup();
     RecentViewsService.load();
   }
@@ -38,7 +41,31 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
   }
 
   void _onCatalogChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {
+      _indexCatalog();
+      _buildRows();
+    });
+  }
+
+  void _indexCatalog() {
+    _byId = {for (final r in RestaurantService.restaurants.value) r.id: r};
+  }
+
+  void _buildRows() {
+    final rows = <Object>[];
+    for (final section in _sections) {
+      final entries = <_HistoryEntry>[];
+      for (final item in section['items'] as List) {
+        final view = RecentView.fromJson(Map<String, dynamic>.from(item as Map));
+        final restaurant = _byId[view.restaurantId];
+        if (restaurant != null) entries.add(_HistoryEntry(view, restaurant, _time(view.lastViewedAt)));
+      }
+      if (entries.isEmpty) continue;
+      rows.add((section['title'] as String).toUpperCase());
+      rows.addAll(entries);
+    }
+    _rows = rows;
   }
 
   Future<void> _regroup() async {
@@ -48,15 +75,12 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
       DateTime.now(),
     );
     if (!mounted || id != _groupId) return;
-    setState(() => _sections = sections);
+    setState(() {
+      _sections = sections;
+      _buildRows();
+    });
   }
 
-  Restaurant? _restaurant(String id) {
-    for (final r in RestaurantService.restaurants.value) {
-      if (r.id == id) return r;
-    }
-    return null;
-  }
 
   Future<void> _remove(Restaurant r) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -133,7 +157,7 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () => RecentViewsService.load(force: true),
-                child: _sections.isEmpty ? _empty() : _list(),
+                child: _rows.isEmpty ? _empty() : _list(),
               ),
             ),
           ],
@@ -167,23 +191,24 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
   }
 
   Widget _list() {
-    final rows = <Widget>[];
-    for (final section in _sections) {
-      final entries = (section['items'] as List)
-          .map((e) => RecentView.fromJson(Map<String, dynamic>.from(e as Map)))
-          .where((v) => _restaurant(v.restaurantId) != null)
-          .toList();
-      if (entries.isEmpty) continue;
-      rows.add(Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-        child: Text(
-          (section['title'] as String).toUpperCase(),
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted, letterSpacing: 0.6),
-        ),
-      ));
-      for (final view in entries) {
-        final r = _restaurant(view.restaurantId)!;
-        rows.add(Dismissible(
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: _rows.length,
+      itemBuilder: (context, i) {
+        final row = _rows[i];
+        if (row is String) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: Text(
+              row,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted, letterSpacing: 0.6),
+            ),
+          );
+        }
+        final entry = row as _HistoryEntry;
+        final r = entry.restaurant;
+        return Dismissible(
           key: ValueKey('recent-${r.id}'),
           direction: DismissDirection.endToStart,
           background: Container(
@@ -201,26 +226,30 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
                     'items': (s['items'] as List).where((e) => (e as Map)['restaurant_id'] != r.id).toList(),
                   },
               ];
+              _buildRows();
             });
             _remove(r);
           },
           child: _RecentRow(
             restaurant: r,
-            view: view,
-            lastSeen: _time(view.lastViewedAt),
+            view: entry.view,
+            lastSeen: entry.lastSeen,
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => DetailScreen(restaurant: r)),
             ),
           ),
-        ));
-      }
-    }
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 24),
-      children: rows,
+        );
+      },
     );
   }
+}
+
+class _HistoryEntry {
+  final RecentView view;
+  final Restaurant restaurant;
+  final String lastSeen;
+
+  const _HistoryEntry(this.view, this.restaurant, this.lastSeen);
 }
 
 class _RecentRow extends StatelessWidget {
