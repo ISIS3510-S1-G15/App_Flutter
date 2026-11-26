@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../models/review.dart';
+import '../services/pending_reviews.dart';
 import '../services/review_service.dart';
 import '../utils/text_utils.dart';
 import '../widgets/back_header.dart';
@@ -23,13 +24,31 @@ class ReviewsListScreen extends StatefulWidget {
 class _ReviewsListScreenState extends State<ReviewsListScreen> {
   RestaurantReviews? _data; // null until the first answer (or when there is no internet and nothing cached)
   bool _loading = true;
+  Review? _pending; // the user's review of this place written offline, not posted yet (shown on top)
 
   Restaurant get restaurant => widget.restaurant;
 
   @override
   void initState() {
     super.initState();
+    // When the queue changes (a review is queued or synced) the "Pending sync" card is updated
+    PendingReviews.count.addListener(_onPendingChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    PendingReviews.count.removeListener(_onPendingChanged); // no listener alive after closing the screen
+    super.dispose();
+  }
+
+  Future<void> _onPendingChanged() async {
+    final hadPending = _pending != null;
+    final pending = (await PendingReviews.forRestaurant(restaurant.id))?.toReview();
+    if (!mounted) return;
+    setState(() => _pending = pending);
+    // It was just posted: reload so the server version of the review takes its place
+    if (hadPending && pending == null) _load(force: true);
   }
 
   // force = the user tapped Retry ("pull on user demand", slides 15): they want new data, not the memory copy
@@ -37,9 +56,11 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
     // initState already starts with _loading = true (setState is not allowed inside initState)
     if (!_loading) setState(() => _loading = true);
     final data = await ReviewService.fetch(restaurant.id, forceRefresh: force); // backend, or the cached copy if offline
+    final pending = (await PendingReviews.forRestaurant(restaurant.id))?.toReview();
     if (!mounted) return; // the user closed the screen before the answer arrived
     setState(() {
       _data = data ?? _data;
+      _pending = pending;
       _loading = false;
     });
   }
@@ -278,6 +299,14 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                       ),
                     ),
 
+                  // The user's review written offline goes on top, marked "Pending sync". The summary above is
+                  // NOT changed: it is calculated by the server over the public reviews only
+                  if (_pending != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _ReviewCard(review: _pending!),
+                    ),
+
                   // One card per review (newest first)
                   ...reviews.map((r) => Padding(
                         padding: const EdgeInsets.only(bottom: 16),
@@ -341,7 +370,7 @@ class _ReviewCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: r.pending ? AppColors.background : AppColors.card, // cream = not posted yet
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.borderLight),
       ),
@@ -368,7 +397,20 @@ class _ReviewCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(r.author, style: AppTextStyles.cardTitle.copyWith(fontSize: 13)),
-                    Text(formatDate(r.date), style: const TextStyle(fontSize: 10, color: AppColors.mutedLight)),
+                    // A queued review has no publication date yet: it says it is waiting to be sent instead
+                    if (r.pending)
+                      const Row(
+                        children: [
+                          Icon(Icons.cloud_upload_outlined, size: 12, color: AppColors.accent),
+                          SizedBox(width: 4),
+                          Text(
+                            'Pending sync',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.accent),
+                          ),
+                        ],
+                      )
+                    else
+                      Text(formatDate(r.date), style: const TextStyle(fontSize: 10, color: AppColors.mutedLight)),
                   ],
                 ),
               ),

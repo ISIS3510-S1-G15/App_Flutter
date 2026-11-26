@@ -11,6 +11,7 @@ import 'services/occupancy_service.dart';
 import 'services/restaurant_service.dart';
 import 'services/profile_service.dart';
 import 'services/pending_events.dart';
+import 'services/pending_reviews.dart';
 import 'services/connectivity_service.dart';
 import 'services/recent_views_service.dart';
 
@@ -54,6 +55,8 @@ class _MainNavigationState extends State<MainNavigation> {
     ReviewService.loadSummaries(); // rating and number of reviews of every restaurant
     OccupancyService.loadAll(source: OccupancyRefreshSource.appOpen); // crowding level of every restaurant (badges)
     PendingEvents.sendAll();
+    // Reviews queued in a previous session: the count feeds the banners, and they are sent now if there is internet
+    PendingReviews.load().then((_) => ReviewService.syncPending());
     RecentViewsService.load();
     ConnectivityService.start();
   }

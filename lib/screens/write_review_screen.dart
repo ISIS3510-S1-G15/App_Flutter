@@ -3,7 +3,6 @@ import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../models/review.dart';
 import '../services/review_service.dart';
-import '../services/connectivity_service.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/back_header.dart';
 import '../widgets/multi_select.dart';
@@ -42,8 +41,9 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   ReviewRatings _ratings = const ReviewRatings(); // All categories start at 0 (not rated)
   List<String> _dietary = [];                     // Dietary options the user selected
   final _commentController = TextEditingController();
-  bool _submitted = false;                         // true after the backend saved the review (shows "¡Gracias!")
+  bool _submitted = false;                         // true after the review was sent OR queued (shows "¡Gracias!")
   bool _sending = false;                           // true while waiting for the backend (avoids double submits)
+  bool _queued = false;                            // true = saved on the phone, posted when back online
 
   @override
   void dispose() {
@@ -66,17 +66,25 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
 
     try {
       // The author is not sent: the backend takes it from the session token (no more "Anonymous" or fake names)
-      await ReviewService.submit(
+      // Offline or server unreachable -> the review is queued on the phone (Hive) and sent on reconnect
+      final outcome = await ReviewService.submit(
         restaurantId: widget.restaurant.id,
         ratings: _ratings,
         dietaryOptions: _dietary,
         comment: _commentController.text.trim(),
       );
       if (!mounted) return; // the user left the screen while the request was running
-      setState(() => _submitted = true);
+      final queued = outcome == ReviewSubmitOutcome.queued;
+      if (queued) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("You're offline. Your review will be posted when you reconnect.")),
+        );
+      }
+      setState(() {
+        _queued = queued;
+        _submitted = true;
+      });
     } catch (e) {
-      // Network only (slides 15): a review must reach the server to count. If it fails, the form stays open
-      // WITH the user's answers (unlike case study 2, where the operator lost the whole form)
       if (!mounted) return;
       setState(() => _sending = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -201,38 +209,30 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
               ),
             ),
 
-            // Submit: disabled (grey) until the 4 categories are rated AND there is internet.
-            // Still Network only (slides 15): offline the user can keep filling the form, and nothing is lost because
-            // it is the same State (unlike case studies 2/3, where the whole form was lost)
+            // Submit: disabled (grey) only until the 4 categories are rated, with or without internet.
+            // Offline the write is queued on the phone (Hive outbox) and posted by itself on reconnect,
+            // so the user never has to come back later to send it (Sprint 3 correction, it used to be network only)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 children: [
                   const OfflineBanner(
                     margin: EdgeInsets.only(bottom: 8),
-                    message: "You're offline. Your answers stay here: you can send the review when you're back online.",
+                    message:
+                        "You're offline. You can still submit: your review will be saved on this phone and posted when you're back online.",
                   ),
-                  ValueListenableBuilder<bool>(
-                    valueListenable: ConnectivityService.isOnline,
-                    builder: (context, online, _) => Column(
-                      children: [
-                        if (!online || !_allRated)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              !online
-                                  ? 'Connect to the internet to send your review'
-                                  : 'Please rate all 4 categories to submit',
-                              style: const TextStyle(fontSize: 11, color: AppColors.mutedLight),
-                            ),
-                          ),
-                        AppPrimaryButton(
-                          label: _sending ? 'Sending...' : 'Submit Review',
-                          // disabled while sending: no duplicates
-                          onTap: online && _allRated && !_sending ? _submit : null,
-                        ),
-                      ],
+                  if (!_allRated)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Please rate all 4 categories to submit',
+                        style: TextStyle(fontSize: 11, color: AppColors.mutedLight),
+                      ),
                     ),
+                  AppPrimaryButton(
+                    label: _sending ? 'Sending...' : 'Submit Review',
+                    // disabled while sending: no duplicates
+                    onTap: _allRated && !_sending ? _submit : null,
                   ),
                 ],
               ),
@@ -269,7 +269,11 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                         text: widget.restaurant.name,
                         style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.dark),
                       ),
-                      const TextSpan(text: ' has been submitted.'),
+                      TextSpan(
+                        text: _queued
+                            ? " is saved and will be posted when you're back online."
+                            : ' has been submitted.',
+                      ),
                     ],
                   ),
                 ),
