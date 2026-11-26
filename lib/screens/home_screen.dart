@@ -12,6 +12,7 @@ import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
 import 'detail_screen.dart';
 import 'profile_screen.dart';
+import 'top_ranking_screen.dart';
 import '../services/saved_service.dart';
 import '../widgets/restaurant_image.dart';
 
@@ -129,6 +130,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 12), // space so the text never touches the avatar
+                  // Orange trophy button that opens Top Ranking (same place as in the Kotlin app)
+                  const TopRankingButton(),
+                  const SizedBox(width: 10),
                   // Dark round button: user's initials if there is a name, otherwise a person icon
                   InkWell(
                     onTap: _onOpenProfile,
