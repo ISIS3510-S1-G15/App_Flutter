@@ -10,14 +10,6 @@ import '../widgets/progress_bar.dart';
 import '../widgets/stars.dart';
 import 'write_review_screen.dart';
 
-// The 4 rating categories shown in the summary bars and in each review card: (key in ReviewRatings, short label)
-const _categories = [
-  (key: 'taste', label: 'Taste'),
-  (key: 'attention', label: 'Service'),
-  (key: 'price', label: 'Value'),
-  (key: 'options', label: 'Diet Options'),
-];
-
 class ReviewsListScreen extends StatefulWidget {
   // StatefulWidget because the reviews now arrive from the backend after the screen opens (loading -> data/error)
   final Restaurant restaurant;
@@ -202,7 +194,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                             Expanded(
                               child: Column(
                                 children: [
-                                  for (final c in _categories)
+                                  for (final c in reviewCategories)
                                     Padding(
                                       padding: const EdgeInsets.symmetric(vertical: 4),
                                       child: _CategoryBar(
@@ -404,7 +396,7 @@ class _ReviewCard extends StatelessWidget {
             crossAxisSpacing: 6,
             childAspectRatio: 4.6,
             children: [
-              for (final c in _categories)
+              for (final c in reviewCategories)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(8)),

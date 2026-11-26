@@ -9,6 +9,7 @@ import '../widgets/circle_button.dart';
 import '../widgets/survey_completion_banner.dart';
 import '../widgets/decision_time_card.dart';
 import 'survey_screen.dart';
+import 'my_reviews_screen.dart';
 import 'auth_gate.dart';
 import '../services/auth_service.dart';
 
@@ -32,6 +33,11 @@ class ProfileScreen extends StatelessWidget {
         builder: (_) => SurveyScreen(onComplete: () => Navigator.of(context).pop()),
       ),
     );
+  }
+
+  void _onMyReviews(BuildContext context) {
+    // Opens the list of reviews the user wrote. It loads them again every time it opens (same as Kotlin)
+    MyReviewsScreen.open(context);
   }
 
   void _handleBack(BuildContext context) {
@@ -342,6 +348,34 @@ class ProfileScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         'Retake Food Preferences Survey',
+                        style: AppTextStyles.body.copyWith(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Actions: see the reviews the user wrote (same position as in the Kotlin profile)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: InkWell(
+                onTap: () => _onMyReviews(context),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.rate_review_outlined, size: 16, color: AppColors.dark),
+                      const SizedBox(width: 8),
+                      Text(
+                        'My Reviews',
                         style: AppTextStyles.body.copyWith(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ],

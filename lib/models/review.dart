@@ -77,3 +77,28 @@ class ReviewRatings {
     );
   }
 }
+
+const reviewCategories = [
+  (key: 'taste', label: 'Taste'),
+  (key: 'attention', label: 'Service'),
+  (key: 'price', label: 'Value'),
+  (key: 'options', label: 'Diet Options'),
+];
+
+class MyReviewsSummary {
+  final int count;
+  final double? averageGiven; // null when the user has no reviews -> the card shows "—"
+
+  const MyReviewsSummary({required this.count, this.averageGiven});
+
+  static const empty = MyReviewsSummary(count: 0);
+
+  factory MyReviewsSummary.from(List<Review> reviews) {
+    if (reviews.isEmpty) return empty;
+    final total = reviews.fold<double>(0, (sum, r) => sum + r.ratings.overall);
+    return MyReviewsSummary(count: reviews.length, averageGiven: total / reviews.length);
+  }
+
+  String get countLabel => count == 1 ? 'review written' : 'reviews written';
+  String get averageLabel => averageGiven == null ? '—' : averageGiven!.toStringAsFixed(1);
+}
