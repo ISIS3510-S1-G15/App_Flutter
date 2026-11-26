@@ -5,6 +5,7 @@ import 'pending_events.dart';
 import 'saved_service.dart';
 import 'profile_service.dart';
 import 'recent_views_service.dart';
+import 'review_service.dart';
 
 class ConnectivityService {
   static final ValueNotifier<bool> isOnline = ValueNotifier(true);
@@ -30,6 +31,7 @@ class ConnectivityService {
         SavedService.load();
         ProfileService.syncPending();
         RecentViewsService.load(force: true);
+        ReviewService.syncPending();
       });
     }
   }

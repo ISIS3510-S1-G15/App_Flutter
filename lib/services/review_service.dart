@@ -2,9 +2,21 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import '../models/review.dart';
 import 'api_client.dart';
+import 'auth_service.dart';
+import 'connectivity_service.dart';
+import 'pending_reviews.dart';
+import 'restaurant_service.dart';
 import 'reviews_db.dart';
 import 'reviews_digest.dart';
 import 'reviews_memory_cache.dart';
+
+// What happened with a submitted review: it reached the server, or it was saved on the phone to be sent later
+enum ReviewSubmitOutcome { sent, queued }
+
+// true = connection/server problem worth retrying later; false = the server rejected the review (4xx)
+// No answer at all (timeout, socket, ClientException) or a 5xx -> retrying makes sense. A 4xx (401 included)
+// means the server said no: sending it again would get the same answer
+bool shouldQueue(Object error) => error is! ApiException || error.statusCode >= 500;
 
 // Rating of one restaurant, CALCULATED by the backend from the real reviews (before it was a fixed number)
 class RatingSummary {
@@ -69,6 +81,14 @@ class ReviewService {
   // false until /reviews/summary answers once: lets RatingText tell "no reviews" from "not loaded (offline)"
   static bool _summariesLoaded = false;
   static bool get summariesLoaded => _summariesLoaded;
+
+  // The sync running right now (null = none). A second call gets THIS same Future instead of starting another
+  // one, so the same review is never posted twice and logout can wait for it to finish
+  static Future<void>? _syncing;
+
+  // Name of the restaurant whose queued review the server rejected while syncing in the background.
+  // My Reviews shows it in a SnackBar: a background process must not fail silently (anti-pattern #9)
+  static final ValueNotifier<String?> syncRejected = ValueNotifier(null);
 
   static RatingSummary summaryOf(String restaurantId) => summaries.value[restaurantId] ?? RatingSummary.empty;
 
@@ -152,23 +172,95 @@ class ReviewService {
     } catch (e) {
       debugPrint('Could not clear local reviews: $e');
     }
+    await PendingReviews.clear(); // the queue belongs to this account: the next one must not send it
   }
 
-  // Sends the review. The author is NOT sent: the backend takes it from the session token.
-  // It THROWS if it fails (instead of failing silently) so the form can stay open with the user's answers
-  static Future<void> submit({
+  // Sends the review, or QUEUES it on the phone when it cannot reach the server (outbox: the write is kept in
+  // Hive and sent on reconnect, Sprint 3 correction of JF-2, which used to be network only).
+  // The author is NOT sent: the backend takes it from the session token.
+  // It still THROWS when the server rejects the review (4xx), so the form stays open with the user's answers
+  static Future<ReviewSubmitOutcome> submit({
     required String restaurantId,
     required ReviewRatings ratings,
     required List<String> dietaryOptions,
     required String comment,
   }) async {
-    await _api.postJson('/restaurants/$restaurantId/reviews', {
-      ...ratings.toJson(),
-      'dietary_options': dietaryOptions,
-      'comment': comment,
-    });
+    final pending = _pendingReview(restaurantId, ratings, dietaryOptions, comment);
+    // Offline: queue it at once, without waiting the 5 s of the request timeout
+    if (!ConnectivityService.isOnline.value) {
+      await PendingReviews.put(pending);
+      return ReviewSubmitOutcome.queued;
+    }
+    try {
+      await _api.postJson('/restaurants/$restaurantId/reviews', pending.body);
+    } catch (e) {
+      if (!shouldQueue(e)) rethrow;
+      debugPrint('Review of $restaurantId queued, the server could not be reached: $e');
+      await PendingReviews.put(pending);
+      return ReviewSubmitOutcome.queued;
+    }
+    // An older queued review of the same place was just replaced on the server by this one
+    await PendingReviews.remove(restaurantId);
     // Invalidates the cached entry so the user's new review shows up immediately (if it fails, nothing breaks)
     await fetch(restaurantId, forceRefresh: true);
+    return ReviewSubmitOutcome.sent;
+  }
+
+  // The queued review keeps who wrote it, so it is only sent with that same session
+  static PendingReview _pendingReview(
+      String restaurantId, ReviewRatings ratings, List<String> dietaryOptions, String comment) {
+    final user = AuthService.currentUser.value;
+    if (user == null) throw StateError('No session: a review needs a logged-in user');
+    return PendingReview(
+      userId: user.id,
+      restaurantId: restaurantId,
+      ratings: ratings,
+      dietaryOptions: dietaryOptions,
+      comment: comment,
+      author: user.name,
+      queuedAt: DateTime.now(),
+    );
+  }
+
+  // Sends the queued reviews. Called when the connection comes back (ConnectivityService), when the app opens
+  // with internet (MainNavigation) and before logout (AuthGate)
+  static Future<void> syncPending() => _syncing ??= _sync().whenComplete(() => _syncing = null);
+
+  static Future<void> _sync() async {
+    final user = AuthService.currentUser.value;
+    if (!ConnectivityService.isOnline.value || user == null) return;
+    var sent = 0;
+    for (final p in await PendingReviews.all()) {
+      if (p.userId != user.id) continue; // never post a review with another account's token
+      try {
+        await _api.postJson('/restaurants/${p.restaurantId}/reviews', p.body);
+        await PendingReviews.remove(p.restaurantId);
+        sent++;
+        // Refreshes the summary, the memory entry and the SQLite copy of that restaurant
+        await fetch(p.restaurantId, forceRefresh: true);
+      } catch (e) {
+        if (shouldQueue(e)) {
+          debugPrint('Pending reviews not sent yet: $e');
+          break; // still no connection / server down: the next reconnection retries
+        }
+        if ((e as ApiException).statusCode == 401) {
+          debugPrint('Session expired while syncing reviews; they stay queued for the next login');
+          break;
+        }
+        // Rejected by the server: retrying would fail forever, so it leaves the queue and the user is told
+        debugPrint('Pending review of ${p.restaurantId} rejected: $e');
+        await PendingReviews.remove(p.restaurantId);
+        syncRejected.value = _restaurantName(p.restaurantId);
+      }
+    }
+    if (sent > 0) await loadSummaries(); // the ratings of Home, Map, Search... now include the sent reviews
+  }
+
+  static String _restaurantName(String restaurantId) {
+    for (final r in RestaurantService.restaurants.value) {
+      if (r.id == restaurantId) return r.name;
+    }
+    return 'a restaurant';
   }
 
   // A new map (instead of changing the old one) so the ValueNotifier notices the change
