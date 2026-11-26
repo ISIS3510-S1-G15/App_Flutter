@@ -82,9 +82,21 @@ class _SearchScreenState extends State<SearchScreen> {
   // Comparing the text against every restaurant is CPU work, not waiting, so a Future alone would still
   // run it on the UI thread; Isolate.run moves it off the UI thread so typing never stutters,
   // even when the catalog grows to hundreds of restaurants
+  static List<Restaurant>? _indexedCatalog;
+  static List<String> _searchIndex = const [];
+
+  static List<String> _indexFor(List<Restaurant> all) {
+    if (!identical(all, _indexedCatalog)) {
+      _searchIndex = buildSearchIndex(all);
+      _indexedCatalog = all;
+    }
+    return _searchIndex;
+  }
+
   static Future<List<Restaurant>> _searchInIsolate(String query) {
     final all = RestaurantService.restaurants.value; // copied into the new isolate
-    return Isolate.run(() => filterRestaurants(all, query));
+    final index = _indexFor(all);
+    return Isolate.run(() => filterRestaurants(all, index, query));
   }
 
   // Called on every keystroke: waits 250 ms without typing before starting a search (debounce),
