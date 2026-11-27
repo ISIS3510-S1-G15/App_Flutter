@@ -4,6 +4,7 @@ import '../models/review.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
 import 'connectivity_service.dart';
+import 'my_reviews_service.dart';
 import 'pending_reviews.dart';
 import 'restaurant_service.dart';
 import 'reviews_db.dart';
@@ -191,14 +192,17 @@ class ReviewService {
       await PendingReviews.put(pending);
       return ReviewSubmitOutcome.queued;
     }
+    final dynamic published; // the server answers the created review (ReviewOut, same shape as Review.fromJson)
     try {
-      await _api.postJson('/restaurants/$restaurantId/reviews', pending.body);
+      published = await _api.postJson('/restaurants/$restaurantId/reviews', pending.body);
     } catch (e) {
       if (!shouldQueue(e)) rethrow;
       debugPrint('Review of $restaurantId queued, the server could not be reached: $e');
       await PendingReviews.put(pending);
       return ReviewSubmitOutcome.queued;
     }
+    // Already on the server: write it through into My Reviews' cache instead of asking the list again
+    await _writeThroughMyReviews(published);
     // An older queued review of the same place was just replaced on the server by this one
     await PendingReviews.remove(restaurantId);
     // Invalidates the cached entry so the user's new review shows up immediately (if it fails, nothing breaks)
@@ -233,7 +237,8 @@ class ReviewService {
     for (final p in await PendingReviews.all()) {
       if (p.userId != user.id) continue; // never post a review with another account's token
       try {
-        await _api.postJson('/restaurants/${p.restaurantId}/reviews', p.body);
+        final published = await _api.postJson('/restaurants/${p.restaurantId}/reviews', p.body);
+        await _writeThroughMyReviews(published);
         await PendingReviews.remove(p.restaurantId);
         sent++;
         // Refreshes the summary, the memory entry and the SQLite copy of that restaurant
@@ -254,6 +259,14 @@ class ReviewService {
       }
     }
     if (sent > 0) await loadSummaries(); // the ratings of Home, Map, Search... now include the sent reviews
+  }
+
+  static Future<void> _writeThroughMyReviews(dynamic json) async {
+    try {
+      await MyReviewsService.onReviewPublished(Review.fromJson(Map<String, dynamic>.from(json as Map)));
+    } catch (e) {
+      debugPrint('Could not write the published review into My Reviews: $e');
+    }
   }
 
   static String _restaurantName(String restaurantId) {
