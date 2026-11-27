@@ -190,8 +190,12 @@ class RankingRepository {
         _ => 5,
       };
 
+  // Same rule as the Kotlin windowCutoff(): the local date 30 days ago, compared with the review's UTC
+  // date ("2026-10-28" >= "2026-10-28"). Using local midnight left out reviews written in the evening in
+  // Colombia (already the next day in UTC), so both apps ranked the month differently
   static DateTime _windowCutoff() {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day).subtract(const Duration(days: windowDays));
+    final day = DateTime(now.year, now.month, now.day - windowDays);
+    return DateTime.utc(day.year, day.month, day.day);
   }
 }
