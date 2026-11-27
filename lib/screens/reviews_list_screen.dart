@@ -8,8 +8,27 @@ import '../utils/text_utils.dart';
 import '../widgets/back_header.dart';
 import '../widgets/app_chip.dart';
 import '../widgets/progress_bar.dart';
+import '../widgets/review_category_grid.dart';
 import '../widgets/stars.dart';
 import 'write_review_screen.dart';
+
+// Created once (compile-time constants) instead of a new Color on every build (slides 19, micro-opt #1).
+// Same values withOpacity gave: alpha = (opacity * 255).round() -> 0.1 = 0x1A, 0.25 = 0x40, 0.5 = 0x80, 0.6 = 0x99
+const _white10 = Color(0x1AFFFFFF); // Colors.white.withOpacity(0.1)
+const _white50 = Color(0x80FFFFFF); // Colors.white.withOpacity(0.5)
+const _white60 = Color(0x99FFFFFF); // Colors.white.withOpacity(0.6)
+const _accent10 = Color(0x1AE8622C); // AppColors.accent.withOpacity(0.1)
+const _accent25 = Color(0x40E8622C); // AppColors.accent.withOpacity(0.25)
+
+// Only so test/review_category_grid_test.dart can check each constant against its old withOpacity value
+@visibleForTesting
+const reviewsListOpacityColors = {
+  'white10': _white10,
+  'white50': _white50,
+  'white60': _white60,
+  'accent10': _accent10,
+  'accent25': _accent25,
+};
 
 class ReviewsListScreen extends StatefulWidget {
   // StatefulWidget because the reviews now arrive from the backend after the screen opens (loading -> data/error)
@@ -160,7 +179,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withOpacity(0.1),
+                        color: _accent10,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -205,7 +224,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   '$reviewCount review${reviewCount != 1 ? 's' : ''}',
-                                  style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
+                                  style: const TextStyle(fontSize: 10, color: _white50),
                                 ),
                               ],
                             ),
@@ -232,11 +251,11 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                         // Commonly noted: dietary options most mentioned by the reviewers ("Vegan options · 2")
                         if (topDiets.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          Divider(height: 1, color: Colors.white.withOpacity(0.1)),
+                          const Divider(height: 1, color: _white10),
                           const SizedBox(height: 12),
-                          Text(
+                          const Text(
                             'COMMONLY NOTED',
-                            style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5), letterSpacing: 0.6),
+                            style: TextStyle(fontSize: 10, color: _white50, letterSpacing: 0.6),
                           ),
                           const SizedBox(height: 8),
                           Wrap(
@@ -246,7 +265,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                                 .map((e) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.1),
+                                        color: _white10,
                                         borderRadius: BorderRadius.circular(999),
                                       ),
                                       child: Text(
@@ -289,7 +308,7 @@ class _ReviewsListScreenState extends State<ReviewsListScreen> {
                                 color: AppColors.accent,
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
-                                  BoxShadow(color: AppColors.accent.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 3)),
+                                  const BoxShadow(color: _accent25, blurRadius: 8, offset: Offset(0, 3)),
                                 ],
                               ),
                               child: Text('Write the first review', style: AppTextStyles.button.copyWith(fontSize: 13)),
@@ -335,12 +354,12 @@ class _CategoryBar extends StatelessWidget {
       children: [
         SizedBox(
           width: 72, // Fixed width so all the bars start at the same position
-          child: Text(label, style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.6))),
+          child: Text(label, style: const TextStyle(fontSize: 10, color: _white60)),
         ),
         Expanded(
           child: AppProgressBar(
             progress: value / 5,
-            trackColor: Colors.white.withOpacity(0.1),
+            trackColor: _white10,
             fillColor: AppColors.amber,
           ),
         ),
@@ -430,27 +449,7 @@ class _ReviewCard extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Category breakdown: 2 x 2 grid of "label + small stars"
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true, // Takes only the height it needs (it is inside a scrolling list)
-            physics: const NeverScrollableScrollPhysics(), // The outer list handles scrolling
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
-            childAspectRatio: 4.6,
-            children: [
-              for (final c in reviewCategories)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(8)),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(c.label, style: const TextStyle(fontSize: 10, color: AppColors.muted))),
-                      StarsDisplay(value: r.ratings.byKey(c.key).toDouble(), size: 9),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+          ReviewCategoryGrid(ratings: r.ratings), // flat 2x2 grid, no nested scrollable (slides 19, #7)
 
           // Dietary options the reviewer marked (small green chips)
           if (r.dietaryOptions.isNotEmpty) ...[
