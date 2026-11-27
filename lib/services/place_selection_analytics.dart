@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,15 +36,6 @@ class DecisionTime {
       );
 }
 
-// Analytics pipeline for the Type 2 BQ (Juan Felipe Ochoa):
-// "How long does it take, on average, for a user to go from opening the app to selecting a place to eat?"
-//
-//   1. Capture:    AppOpenTracker calls markAppOpen() with the same "open" definition as the Type 1 BQ,
-//                  and DetailScreen calls logSelection() when the user taps "Get directions"
-//   2. Storage:    POST /analytics/place-selection saves the user (from the token), the restaurant,
-//                  the milliseconds since the open and the meal moment of the open
-//   3. Processing: GET /analytics/time-to-selection -> average, median, p90 and % within 1 and 5 minutes
-//   4. Report:     GET /analytics/time-to-selection/export (CSV)
 class PlaceSelectionAnalytics {
   static final ApiClient _api = ApiClient();
 
@@ -65,19 +57,24 @@ class PlaceSelectionAnalytics {
     _alreadySelected = false;
   }
 
-  // Only the FIRST "Get directions" after each open counts: later taps are no longer "time until choosing"
-  static Future<void> logSelection(String restaurantId) async {
-    if (_alreadySelected || !_sinceOpen.isRunning) return;
-    _alreadySelected = true; // set before the await so a fast double tap cannot send a duplicate
+  static Duration? logSelection(String restaurantId, {String source = 'detail'}) {
+    if (_alreadySelected || !_sinceOpen.isRunning) return null;
+    _alreadySelected = true; // set before sending so a fast double tap cannot send a duplicate
     final elapsed = _sinceOpen.elapsed;
-    if (elapsed > _maxDuration) return;
+    if (elapsed > _maxDuration) return null;
 
     final body = <String, dynamic>{
       'restaurant_id': restaurantId,
       'ms_since_app_open': elapsed.inMilliseconds,
       'meal_slot': _openMealSlot,
+      'source': source, // "detail" or "quick_pick"
     };
-    // The duration is already measured at the tap, so it stays correct even if the event is sent hours later
+    unawaited(_send(body));
+    return elapsed;
+  }
+
+  // The duration is already measured at the tap, so it stays correct even if the event is sent hours later
+  static Future<void> _send(Map<String, dynamic> body) async {
     try {
       await _api.postJson('/analytics/place-selection', body);
     } catch (e) {
@@ -86,7 +83,7 @@ class PlaceSelectionAnalytics {
     }
   }
 
-  // Type 2: the answer goes back to the user. Strategy "Network falling back to cache" (slides 15):
+  // Type 2: the answer goes back to the user. Strategy "Network falling back to cache"
   // always ask the backend; without internet, show the last value saved on this phone for THIS user
   static Future<DecisionTime?> mySummary() async {
     final userId = AuthService.currentUser.value?.id;

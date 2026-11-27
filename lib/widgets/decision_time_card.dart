@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/place_selection_analytics.dart';
+import '../utils/text_utils.dart';
 
 // Type 2 BQ answered to the user in Profile. Same look and offline behavior as SurveyCompletionBanner,
 // so both BQ answers next to each other read as one consistent block
@@ -22,8 +23,8 @@ class _DecisionTimeCardState extends State<DecisionTimeCard> {
     return '${diff.inDays} d ago';
   }
 
-  // < 60 s -> "less than a minute"; otherwise rounded minutes ("about 3 min")
-  String _duration(double seconds) => seconds < 60 ? 'less than a minute' : 'about ${(seconds / 60).round()} min';
+  // < 60 s -> "less than a minute"; otherwise rounded minutes ("about 3 min"). Shared with the Quick Pick feedback
+  String _duration(double seconds) => formatDecisionTime(seconds);
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +59,9 @@ class _DecisionTimeCardState extends State<DecisionTimeCard> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         TextSpan(text: ' Students take $campus on average.'),
+                        // Slower than campus: the answer now points to the action that fixes it
+                        if (mine > data.campusSeconds)
+                          const TextSpan(text: ' Quick Pick on Discover takes you to your usual place in one tap.'),
                       ] else ...[
                         TextSpan(
                           text: 'Students usually pick a place in $campus',

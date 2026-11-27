@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/app_usage_analytics.dart';
 import '../services/place_selection_analytics.dart';
+import '../services/quick_pick_service.dart';
 
 // Wraps the main app (only shown to logged-in users) and records every time the user opens it.
 // "Open" = entering the app after logging in / restoring the session, or coming back from the
@@ -48,6 +49,8 @@ class _AppOpenTrackerState extends State<AppOpenTracker> with WidgetsBindingObse
   void _registerOpen() {
     AppUsageAnalytics.logAppOpen();
     PlaceSelectionAnalytics.markAppOpen();
+    // Coming back to the app can be another meal moment: refresh the Quick Pick with the same "open" definition
+    QuickPickService.load();
   }
 
   @override
