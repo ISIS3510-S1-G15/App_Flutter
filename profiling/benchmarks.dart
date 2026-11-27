@@ -1,4 +1,5 @@
 import 'package:app_flutter/models/restaurant.dart';
+import 'package:app_flutter/models/review.dart';
 import 'package:app_flutter/services/recent_views_service.dart';
 import 'package:app_flutter/utils/search_filter.dart';
 
@@ -132,3 +133,33 @@ List<BenchmarkResult> runMicroOptimizationBenchmarks({int catalogSize = 2000, in
     measure('Recently Viewed rows – after', () => historyRowsAfter(catalog, history, frames)),
   ];
 }
+
+const _reviewDiets = ['Vegan options', 'Vegetarian options', 'Gluten-free', 'Halal', 'Kosher'];
+const _reviewComments = [
+  '',
+  'Good.',
+  'Great arepas and fast service, I would come back.',
+  'The portions are big and the price is fair. It gets crowded at noon, so better go early or late.',
+  'Nice place to study with a coffee. The vegan options are limited but tasty, and the staff is always friendly '
+      'even when the line is long. Wish they had more seats near the windows.',
+];
+
+// Synthetic reviews for the review-cards benchmark (Juan Felipe, issue #113): always the same data,
+// so the before and after runs compare exactly the same work
+List<Review> syntheticReviews(int size) => List.generate(
+      size,
+      (i) => Review(
+        id: '$i',
+        restaurantId: 'r$i',
+        author: 'Ana',
+        date: DateTime(2026, 11, 27).subtract(Duration(days: i)), // newest first
+        ratings: ReviewRatings(
+          taste: i % 5 + 1,
+          attention: (i + 1) % 5 + 1,
+          price: (i + 2) % 5 + 1,
+          options: (i + 4) % 5 + 1,
+        ),
+        dietaryOptions: [for (var d = 0; d < i % 3; d++) _reviewDiets[(i + d) % _reviewDiets.length]], // 0-2 diets
+        comment: _reviewComments[i % _reviewComments.length],
+      ),
+    );
