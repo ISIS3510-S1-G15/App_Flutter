@@ -10,6 +10,7 @@ import '../services/review_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/pending_reviews.dart';
 import '../services/my_reviews_service.dart';
+import '../services/review_draft_store.dart';
 import '../widgets/app_open_tracker.dart';
 import 'login_screen.dart';
 import 'survey_screen.dart';
@@ -56,6 +57,7 @@ class AuthGate extends StatefulWidget {
     await RecentViewsService.clearLocal();
     await ReviewService.clearLocal(); // the next account must not see a local copy that includes other people's names
     await MyReviewsService.clearLocal(); // nor this user's own reviews saved for offline use
+    await ReviewDraftStore.clearAll(); // drafts are this user's unsent answers: the next account must not see them
     userProfile.value = const SurveyAnswers(); // the next person must not see this user's preferences
     navigator.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
   }

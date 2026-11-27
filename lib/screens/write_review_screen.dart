@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/restaurant.dart';
 import '../models/review.dart';
+import '../models/review_draft.dart';
+import '../services/auth_service.dart';
+import '../services/review_draft_store.dart';
 import '../services/review_service.dart';
 import '../widgets/offline_banner.dart';
 import '../widgets/back_header.dart';
@@ -38,7 +42,8 @@ class WriteReviewScreen extends StatefulWidget {
   State<WriteReviewScreen> createState() => _WriteReviewScreenState();
 }
 
-class _WriteReviewScreenState extends State<WriteReviewScreen> {
+// WidgetsBindingObserver: to save the draft at once when the app goes to the background (slides 13)
+class _WriteReviewScreenState extends State<WriteReviewScreen> with WidgetsBindingObserver {
   ReviewRatings _ratings = const ReviewRatings(); // All categories start at 0 (not rated)
   List<String> _dietary = [];                     // Dietary options the user selected
   final _commentController = TextEditingController();
@@ -46,10 +51,80 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   bool _sending = false;                           // true while waiting for the backend (avoids double submits)
   bool _queued = false;                            // true = saved on the phone, posted when back online
 
+  // Draft (local storage, Hive typed box): the answers survive leaving the screen or closing the app
+  bool _draftLoaded = false;
+  bool _draftRestored = false; // shows "Draft restored from device" + Discard
+  Timer? _draftTimer;          // debounce: one disk write 400 ms after the LAST change, not one per letter
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadDraft();
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // no observer alive after closing the screen
+    if (_draftTimer?.isActive == true) {
+      _draftTimer!.cancel();
+      _saveDraftNow();
+    }
     _commentController.dispose(); // Frees the memory of the text controller
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _draftTimer?.cancel();
+      _saveDraftNow();
+    }
+  }
+
+  Future<void> _loadDraft() async {
+    final draft = await ReviewDraftStore.load(widget.restaurant.id); // null if none or another account's
+    if (!mounted) return;
+    if (draft != null) {
+      setState(() {
+        _ratings = draft.ratings;
+        _dietary = [...draft.dietaryOptions];
+        _commentController.text = draft.comment;
+        _draftRestored = true;
+      });
+    }
+    _draftLoaded = true;
+  }
+
+  void _scheduleDraftSave() {
+    if (!_draftLoaded || _submitted) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 400), _saveDraftNow);
+  }
+
+  void _saveDraftNow() {
+    final user = AuthService.currentUser.value;
+    if (!_draftLoaded || _submitted || user == null) return;
+    ReviewDraftStore.save(ReviewDraft(
+      userId: user.id,
+      restaurantId: widget.restaurant.id,
+      ratings: _ratings,
+      dietaryOptions: _dietary,
+      comment: _commentController.text, // as typed, so it comes back exactly the same
+      savedAt: DateTime.now(),
+    ));
+  }
+
+  // "Discard": empty form, no banner, and the stored draft is gone (it will not come back)
+  void _discardDraft() {
+    _draftTimer?.cancel();
+    setState(() {
+      _ratings = const ReviewRatings();
+      _dietary = [];
+      _draftRestored = false;
+    });
+    _commentController.clear();
+    ReviewDraftStore.delete(widget.restaurant.id);
   }
 
   // The review can only be submitted when the 4 categories have at least 1 star
@@ -58,22 +133,23 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   void _toggleDiet(String d) {
     // Adds the option if it isn't selected, removes it if it already is
     setState(() => _dietary = _dietary.contains(d) ? _dietary.where((x) => x != d).toList() : [..._dietary, d]);
+    _scheduleDraftSave();
   }
 
   Future<void> _submit() async {
     if (!_allRated || _sending) return;
+    _draftTimer?.cancel(); // the answers are about to be sent: no draft write should land after this
     FocusScope.of(context).unfocus(); // Closes the keyboard if the comment field was open
     setState(() => _sending = true);
 
     try {
-      // The author is not sent: the backend takes it from the session token (no more "Anonymous" or fake names)
-      // Offline or server unreachable -> the review is queued on the phone (Hive) and sent on reconnect
       final outcome = await ReviewService.submit(
         restaurantId: widget.restaurant.id,
         ratings: _ratings,
         dietaryOptions: _dietary,
         comment: _commentController.text.trim(),
       );
+      await ReviewDraftStore.delete(widget.restaurant.id);
       if (!mounted) return; // the user left the screen while the request was running
       final queued = outcome == ReviewSubmitOutcome.queued;
       if (queued) {
@@ -115,6 +191,11 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                 children: [
+                  if (_draftRestored) ...[
+                    _DraftRestoredBanner(onDiscard: _discardDraft),
+                    const SizedBox(height: 20),
+                  ],
+
                   // Star ratings: one row of stars per category
                   _FormCard(
                     title: 'Rate your experience',
@@ -135,7 +216,10 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                         const SizedBox(height: 8),
                         StarRatingInput(
                           value: _ratings.byKey(c.key),
-                          onChanged: (v) => setState(() => _ratings = _ratings.copyWithKey(c.key, v)),
+                          onChanged: (v) {
+                            setState(() => _ratings = _ratings.copyWithKey(c.key, v));
+                            _scheduleDraftSave();
+                          },
                         ),
                         const SizedBox(height: 20),
                       ],
@@ -202,7 +286,8 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                         maxLines: 4,
                         maxLength: _maxCommentLength,
                         fillColor: AppColors.background,
-                        onChanged: (_) {}, // The controller already keeps the text; nothing else to update
+                        // The controller already keeps the text; this only schedules the (debounced) draft save
+                        onChanged: (_) => _scheduleDraftSave(),
                       ),
                     ],
                   ),
@@ -342,6 +427,42 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DraftRestoredBanner extends StatelessWidget {
+  final VoidCallback onDiscard;
+
+  const _DraftRestoredBanner({required this.onDiscard});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Text(
+            'Draft restored from device',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white),
+          ),
+          GestureDetector(
+            onTap: onDiscard,
+            child: const Text(
+              'Discard',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.dark),
+            ),
+          ),
+        ],
       ),
     );
   }
