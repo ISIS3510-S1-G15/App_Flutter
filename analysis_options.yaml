@@ -33,6 +33,10 @@ linter:
   rules:
     # avoid_print: false  # Uncomment to disable the `avoid_print` rule
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # Linters to find micro-optimization opportunities (slides 19, micro-opt #8): a const widget/object is
+    # created once at compile time instead of on every build. flutter_lints 6 only enables the
+    # *_in_immutables variant, so this one is explicit (issue #113)
+    prefer_const_constructors: true
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

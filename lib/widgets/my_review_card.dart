@@ -3,7 +3,7 @@ import '../models/review.dart';
 import '../theme/app_theme.dart';
 import '../utils/text_utils.dart';
 import 'app_chip.dart';
-import 'stars.dart';
+import 'review_category_grid.dart';
 
 // One review written by the user, in My Reviews. Same card as the one in the Reviews list, except the header:
 // the author is always the user, so it shows WHICH restaurant was reviewed instead of the avatar + author
@@ -82,27 +82,7 @@ class MyReviewCard extends StatelessWidget {
               const SizedBox(height: 12),
 
               // Category breakdown: 2 x 2 grid of "label + small stars" (same as the Reviews list card)
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true, // Takes only the height it needs (it is inside a scrolling list)
-                physics: const NeverScrollableScrollPhysics(), // The outer list handles scrolling
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
-                childAspectRatio: 4.6,
-                children: [
-                  for (final c in reviewCategories)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(8)),
-                      child: Row(
-                        children: [
-                          Expanded(child: Text(c.label, style: const TextStyle(fontSize: 10, color: AppColors.muted))),
-                          StarsDisplay(value: r.ratings.byKey(c.key).toDouble(), size: 9),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+              ReviewCategoryGrid(ratings: r.ratings), // flat 2x2 grid, no nested scrollable
 
               // Dietary options the user marked (small green chips)
               if (r.dietaryOptions.isNotEmpty) ...[
