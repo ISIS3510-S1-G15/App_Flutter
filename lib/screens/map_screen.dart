@@ -410,6 +410,23 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 12),
 
+            // ---------- Offline notice + recommendation banner ----------
+            // Above the map, in the same place as the Kotlin MapView
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildOfflineNotice(),
+                  ValueListenableBuilder(
+                    valueListenable: OccupancyService.statuses,
+                    builder: (context, _, _) => _buildLocationBanner(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // ---------- Map area ----------
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -543,14 +560,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                 children: [
-                  _buildOfflineNotice(),
-                  ValueListenableBuilder(
-                    valueListenable: OccupancyService.statuses,
-                    builder: (context, _, _) => _buildLocationBanner(),
-                  ),
-                  const SizedBox(height: 12),
                   Text(
-                    _position != null ? 'Closest to you — ${visible.length} spots' : 'Nearby — ${visible.length} spots',
+                    'Nearby — ${visible.length} spots', // same title as the Kotlin MapView
                     style: AppTextStyles.cardTitle.copyWith(fontSize: 14),
                   ),
                   const SizedBox(height: 12),

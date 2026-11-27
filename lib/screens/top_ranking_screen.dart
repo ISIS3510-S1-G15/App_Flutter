@@ -131,7 +131,9 @@ class _TopRankingScreenState extends State<TopRankingScreen> {
   }
 
   String? get _status {
-    final time = _lastUpdated == null ? null : TimeOfDay.fromDateTime(_lastUpdated!).format(context);
+    // 24-hour "HH:mm", same as the Kotlin RankingView
+    final t = _lastUpdated;
+    final time = t == null ? null : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     if (_refreshQueued) return "Refresh queued · it will update when you're back online";
     if (!_online) return 'Offline · showing saved ranking${time == null ? '' : ' from $time'}';
     if (time != null) return 'Updated $time';

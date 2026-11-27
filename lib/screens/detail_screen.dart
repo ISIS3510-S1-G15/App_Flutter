@@ -326,17 +326,6 @@ class _DetailScreenState extends State<DetailScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   ),
                 ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: _onGetDirections,
-                  icon: const Icon(Icons.directions_walk, size: 16),
-                  label: const Text('Get directions'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.closed.withOpacity(0.3)),
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  ),
-                ),
 
                 // ---------- Description ----------
                 if (r.description.isNotEmpty) ...[
@@ -409,6 +398,27 @@ class _DetailScreenState extends State<DetailScreen> {
                 ],
 
                 const SizedBox(height: 12),
+
+                // ---------- Get directions ----------
+                // Same place and style as the Kotlin DetailView: dark button with a pin, right above the reviews
+                ElevatedButton(
+                  onPressed: _onGetDirections,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.dark,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.location_on, size: 16, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text('Get directions', style: AppTextStyles.button),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
 
                 // ---------- Review CTAs ----------
                 OutlinedButton(
