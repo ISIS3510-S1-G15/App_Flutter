@@ -4,6 +4,7 @@ import '../models/review.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
 import 'connectivity_service.dart';
+import 'my_reviews_memory_cache.dart';
 import 'pending_reviews.dart';
 
 // Design pattern: REPOSITORY. This service is the ONLY access point to "my reviews" (the reviews written by
@@ -39,6 +40,14 @@ List<Review> mergeMyReviews(List<Review> server, List<Review> pending) {
   return [...sortedPending, ...server.where((r) => !queuedPlaces.contains(r.restaurantId))];
 }
 
+// Same rule as the backend: one review per user and restaurant, the newer one replaces the older.
+// Returns a NEW list (the one read from Hive is never mutated)
+List<Map<String, dynamic>> upsertReviewJson(List<Map<String, dynamic>> items, Map<String, dynamic> review) {
+  final index = items.indexWhere((item) => item['restaurant_id'] == review['restaurant_id']);
+  if (index == -1) return [...items, review]; // first review of that place: added
+  return [...items]..[index] = review; // same place: replaced, never duplicated
+}
+
 class MyReviewsService {
   static final ApiClient _api = ApiClient(); // Singleton: already carries the user's session token
 
@@ -46,6 +55,10 @@ class MyReviewsService {
   // Keys: user_id (whose copy it is), saved_at (ISO) and items (list of review.toJson())
   static const _boxName = 'my_reviews';
   static bool _initialized = false;
+
+  // CACHING (slides 17): this session's copy in RAM, filled only by the network and kept exact by
+  // write-through (onReviewPublished). Reopening My Reviews then reads neither the disk nor the network
+  static final MyReviewsMemoryCache _memory = MyReviewsMemoryCache();
 
   // Same pattern as PendingEvents: Hive is initialized once, guarded by a flag
   static Future<Box> _box() async {
@@ -56,11 +69,20 @@ class MyReviewsService {
     return Hive.openBox(_boxName);
   }
 
-  // CACHE THEN NETWORK (slides 15, strategy #5): emits the local copy first (instant, offline too),
+  // CACHE THEN NETWORK: emits the local copy first (instant, offline too),
   // then the backend answer, which also refreshes the local copy. async* = a Stream that emits over time
   static Stream<MyReviewsSnapshot> watch() async* {
     final userId = AuthService.currentUser.value?.id;
-    var pending = await _pending(userId);
+    var pending = await _pending(userId); // pending reviews always go on top, also over the memory copy
+
+    final cached = userId == null ? null : _memory.get(userId);
+    if (cached != null) {
+      debugPrint('My reviews cache hit (${cached.length} reviews, ${_memory.hits} hits / ${_memory.misses} misses)');
+      yield _snapshot(cached, pending, fromCache: false, savedAt: _memory.loadedAt);
+      return;
+    }
+    debugPrint('My reviews cache miss: reading the Hive copy, then the backend');
+
     final local = await _readLocal(userId);
 
     // 1. Cache: what is on the phone, shown before any network request
@@ -79,6 +101,9 @@ class MyReviewsService {
     // 3. Network: the fresh list replaces the cached one on screen AND on disk
     try {
       final server = await _fetchNetwork();
+      // Only a network answer fills the memory; the Hive copy never does, because it was not confirmed by
+      // the server in this session (same rule as fromNetwork in the Sprint 3 cache)
+      if (userId != null) _memory.replaceAll(userId, server);
       await _saveLocal(userId, server);
       // Read again: the queue may have been synced while the request was running
       pending = await _pending(userId);
@@ -94,8 +119,20 @@ class MyReviewsService {
     }
   }
 
-  // Logout: the next account must never see this user's copy
+  // WRITE-THROUGH: called by ReviewService right after the server accepted a review (POST answer).
+  // Updates the memory cache AND the Hive copy, so My Reviews shows it at once, online or offline,
+  // without asking GET /me/reviews again (event-based invalidation instead of a TTL)
+  static Future<void> onReviewPublished(Review review) async {
+    final userId = AuthService.currentUser.value?.id;
+    if (userId == null) return;
+    final applied = _memory.upsert(userId, review); // false = no full list in memory yet: the next GET fills it
+    debugPrint('My reviews write-through: ${review.restaurantId} (memory: $applied)');
+    await _upsertLocal(userId, review);
+  }
+
+  // Logout: the next account must never see this user's copy (disk or memory)
   static Future<void> clearLocal() async {
+    _memory.clear();
     try {
       await (await _box()).clear();
     } catch (e) {
@@ -142,6 +179,22 @@ class MyReviewsService {
     } catch (e) {
       debugPrint('Could not read the local copy of my reviews: $e');
       return null;
+    }
+  }
+
+  // Write-through into the Hive copy. Only when a full copy of THIS user exists: a partial copy with a single
+  // review would hide the others offline; without a copy the next GET creates the complete one.
+  // saved_at is NOT changed: it still says when the last full download happened
+  static Future<void> _upsertLocal(int userId, Review review) async {
+    try {
+      final box = await _box();
+      if (box.isEmpty || box.get('user_id') != userId) return;
+      final items = [
+        for (final item in (box.get('items') as List? ?? const [])) Map<String, dynamic>.from(item as Map),
+      ];
+      await box.put('items', upsertReviewJson(items, review.toJson()));
+    } catch (e) {
+      debugPrint('Could not write the published review into the local copy: $e');
     }
   }
 
