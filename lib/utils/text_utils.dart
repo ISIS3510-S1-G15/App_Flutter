@@ -13,3 +13,11 @@ const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
 
 // Formats a date like "Sep 12, 2026" (used in the review cards)
 String formatDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
+
+// Decision times of the BQ Type 2, shared by DecisionTimeCard (Profile) and the Quick Pick feedback:
+// "about 3 min" from a minute up; below it "less than a minute", or the exact seconds ("12 s") when the
+// caller wants the user to see a short time precisely
+String formatDecisionTime(double seconds, {bool exactSeconds = false}) {
+  if (seconds < 60) return exactSeconds ? '${seconds.round()} s' : 'less than a minute';
+  return 'about ${(seconds / 60).round()} min';
+}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/restaurant_service.dart';
 import '../data/profile_data.dart';
+import '../models/quick_pick.dart';
 import '../models/restaurant.dart';
 import '../utils/text_utils.dart';
 import '../utils/meal_context.dart';
@@ -10,7 +11,12 @@ import '../widgets/crowding_badge.dart';
 import '../widgets/rating_text.dart';
 import '../widgets/filter_chip.dart';
 import '../services/filter_analytics.dart';
+import '../services/occupancy_check_analytics.dart';
+import '../services/place_selection_analytics.dart';
+import '../services/quick_pick_service.dart';
+import '../widgets/quick_pick_card.dart';
 import 'detail_screen.dart';
+import 'directions_screen.dart';
 import 'profile_screen.dart';
 import 'top_ranking_screen.dart';
 import '../services/saved_service.dart';
@@ -33,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Context-aware: redraws the screen every minute so the greeting, the meal moment and the
   // "open now" pick follow the real time even if the user leaves the app open
   Timer? _clock;
+  String _mealSlot = mealSlotFor(DateTime.now()); // to notice when the meal moment changes
 
   @override
   void initState() {
@@ -40,9 +47,20 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     userProfile.addListener(_onProfileChanged);
     RestaurantService.restaurants.addListener(_onProfileChanged); // redraws when the list arrives from the backend
+    // BQ Type 2 answer turned into an action: the Quick Pick card appears when the suggestion arrives
+    QuickPickService.current.addListener(_onProfileChanged);
+    QuickPickService.load();
     // Listens to the profile saved by the survey, so the greeting and avatar update if the user edits it
     _clock = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      // The meal moment changed while Discover stayed open (e.g. lunch -> afternoon snack): ask for the
+      // Quick Pick of the new moment instead of keeping the old one
+      final slot = mealSlotFor(DateTime.now());
+      if (slot != _mealSlot) {
+        _mealSlot = slot;
+        QuickPickService.load();
+      }
+      setState(() {});
     });
   }
 
@@ -51,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Stops listening when the screen is destroyed (otherwise it would try to redraw a screen that no longer exists)
     userProfile.removeListener(_onProfileChanged);
     RestaurantService.restaurants.removeListener(_onProfileChanged);
+    QuickPickService.current.removeListener(_onProfileChanged);
     _clock?.cancel(); // stops the timer, otherwise it would keep running after the screen is gone
     super.dispose();
   }
@@ -77,6 +96,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Quick Pick "Get directions": straight to the route, no search, no detail, no comparing
+  void _onQuickPick(Restaurant r, QuickPick pick) {
+    // A decision to go, same as in the Detail: keeps the team's "did they check the occupancy?" BQ consistent
+    OccupancyCheckAnalytics.logGoDecision(r.id);
+    final elapsed = PlaceSelectionAnalytics.logSelection(r.id, source: 'quick_pick');
+    // Taken BEFORE navigating: the SnackBar is shown over the route screen
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => DirectionsScreen(restaurant: r)));
+    // The user SEES the improvement: how long this decision took vs. usual (only if it was faster)
+    final feedback = elapsed == null ? null : quickPickFeedback(elapsed, pick);
+    if (feedback != null) messenger.showSnackBar(SnackBar(content: Text(feedback)));
+  }
+
   void _onOpenProfile() {
     // Called when the user taps the avatar in the header. Pushes the profile on top so its back button returns here
     Navigator.of(context).push(
@@ -95,6 +127,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final featured = contextualPick(RestaurantService.restaurants.value, now);
     // True if, in the survey, the user said they usually eat at this moment of the day
     final usualMealTime = profile.mealTimes.contains(mealSlot);
+    // Quick Pick: first suggested place that exists and is open now, only for the CURRENT meal moment
+    final quickPick = QuickPickService.current.value;
+    final quickPickPlace = quickPick != null && quickPick.mealSlot == mealSlot
+        ? resolveQuickPick(quickPick, RestaurantService.restaurants.value, now)
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -156,6 +193,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Today's Pick (context-aware): changes with the time of day. Only shown when no category filter is active
             if (_activeCategory == 'All') ...[
+              // Quick Pick (BQ Type 2): only when there is a place to suggest; otherwise not even its space
+              if (quickPick != null && quickPickPlace != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  child: QuickPickCard(
+                    pick: quickPick,
+                    restaurant: quickPickPlace,
+                    onGo: () => _onQuickPick(quickPickPlace, quickPick),
+                    onDismiss: QuickPickService.dismissToday,
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
