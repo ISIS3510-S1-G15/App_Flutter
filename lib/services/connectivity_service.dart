@@ -26,12 +26,13 @@ class ConnectivityService {
     final cameBack = online && !isOnline.value;
     isOnline.value = online;
     if (cameBack) {
-            Future.delayed(const Duration(seconds: 3), () {
+      Future.delayed(const Duration(seconds: 3), () {
         PendingEvents.sendAll();
         SavedService.load();
         ProfileService.syncPending();
         RecentViewsService.load(force: true);
         ReviewService.syncPending();
+        ReviewService.loadSummaries();
       });
     }
   }
